@@ -1,6 +1,7 @@
 from notebook.services.contents.manager import ContentsManager
 
 from dwcontents.api import DwContentsApi
+from dwcontents.models import map_root, map_account, map_dataset, map_subdir
 
 
 class DwContents(ContentsManager):
@@ -49,75 +50,29 @@ class DwContents(ContentsManager):
         if owner is None:
             # List root content
             self.log.info('Processing root')
-            root = DwContents._map_root(self.api.get_me())
-            accounts = sorted({d['owner'] for d in self.api.get_datasets()})
-            root['content'] = [DwContents._map_account(
-                self.api.get_user(a)) for a in accounts]
-            return root
+            return map_root(self.api.get_me(), self.api.get_datasets(),
+                            include_content=True)
         elif dataset_id is None:
             # List account content
-            self.log.info('Processing {}'.format(owner))
-            account_dir = DwContents._map_account(self.api.get_user(owner))
-            account_dir['content'] = [DwContents._map_dataset(d)
-                                      for d in self.api.get_datasets()
-                                      if d['owner'] == owner]
-            return account_dir
+            self.log.info('Processing account {}'.format(owner))
+            return map_account(
+                owner,
+                [d for d in self.api.get_datasets() if d['owner'] == owner],
+                include_content=True)
         else:
             if type == 'directory':
                 # List dataset content
-                self.log.info('Processing {}'.format(dataset_id))
                 dataset = self.api.get_dataset(owner, dataset_id)
-
-                prefix = file_path if file_path is not None else ''
-                directory_files = [f for f in dataset['files']
-                                   if f['name'].startswith(prefix)]
-
-                files = []
-                subdirectories = dict()
-                for f in directory_files:
-                    if '/' not in f['name']:
-                        files.append({
-                            'name': f['name'],
-                            'path': '{}/{}/{}/{}'.format(
-                                owner, dataset_id, prefix, f['name']
-                            ),
-                            'created': f['created'],
-                            'last_modified': f['updated']
-                        })
-                    else:
-                        subdir_name = f['name'].split('/')[0]
-                        subdir = subdirectories.get(subdir_name, dict())
-                        subdir.update({
-                            'name': subdir_name,
-                            'path': '{}/{}/{}/{}'.format(
-                                owner, dataset_id, prefix, subdir_name
-                            ),
-                            'created': (
-                                f['created']
-                                if ('created' not in subdir
-                                    or subdir['created'] > f['created'])
-                                else subdir['created']),
-                            'last_modified': (
-                                f['updated']
-                                if ('last_modified' not in subdir
-                                    or subdir['last_modified'] < f['updated'])
-                                else subdir['last_modified'])
-                        })
-                        subdirectories[subdir_name] = subdir
-
-                files = sorted(files, key=lambda f: f['name'])
-                subdir_list = sorted(subdirectories.values(),
-                                     key=lambda s: s['name'])
-
-                dataset_dir = DwContents._map_dataset(dataset)
-                dataset_dir['content'] = (
-                    [DwContents._map_subdirectory(s)
-                     for s in subdir_list] +
-                    [DwContents._map_content_free_entity(f)
-                     for f in files])
-
-                return dataset_dir
-
+                if file_path is not None:
+                    parent, _, subdir = file_path.rpartition('/')
+                    self.log.info('Processing subdir {} of {}'.format(
+                        subdir, parent
+                    ))
+                    return map_subdir(subdir, parent, dataset,
+                                      include_content=True)
+                else:
+                    self.log.info('Processing dataset {}'.format(dataset_id))
+                    return map_dataset(dataset, include_content=True)
             else:
                 pass
 
@@ -138,62 +93,6 @@ class DwContents(ContentsManager):
 
     def is_hidden(self, path):
         return False
-
-    @staticmethod
-    def _map_root(me):
-        return DwContents._map_directory('', '', me['created'], me['updated'],
-                                         False)
-
-    @staticmethod
-    def _map_account(user):
-        return DwContents._map_directory(
-            user['id'], user['id'], user['created'], user['updated'], False)
-
-    @staticmethod
-    def _map_dataset(dataset):
-        return DwContents._map_directory(
-            dataset['title'],
-            '{}/{}'.format(dataset['owner'], dataset['id']),
-            dataset['created'],
-            dataset['updated']
-        )
-
-    @staticmethod
-    def _map_subdirectory(subdir):
-        return DwContents._map_directory(
-            subdir['name'],
-            subdir['path'],
-            subdir['created'],
-            subdir['last_modified'],
-            False
-        )
-
-    @staticmethod
-    def _map_content_free_entity(file):
-        return {
-            'name': file['name'],
-            'path': file['path'],
-            'type': 'notebook' if file['name'].endswith('ipynb') else 'file',
-            'created': file['created'],
-            'last_modified': file['last_modified'],
-            'mimetype': None if file['name'].endswith(
-                'ipynb') else 'application/octet-stream',
-            'writable': True,
-            'format': 'json' if file['name'].endswith('ipynb') else 'base64'
-        }
-
-    @staticmethod
-    def _map_directory(name, path, created, last_modified, writable=True):
-        return {
-            'name': name,
-            'path': path,
-            'type': 'directory',
-            'created': created,
-            'last_modified': last_modified,
-            'mimetype': None,
-            'writable': writable,
-            'format': 'json'
-        }
 
     @staticmethod
     def _to_dw_path(path):

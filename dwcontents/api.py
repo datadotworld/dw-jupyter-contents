@@ -5,6 +5,7 @@ from requests import Request, Session
 from requests.adapters import BaseAdapter, HTTPAdapter
 
 from dwcontents import __version__
+from dwcontents.utils import unique_justseen
 
 MAX_TRIES = 10  # necessary to configure backoff decorator
 
@@ -45,7 +46,7 @@ class DwContentsApi(object):
 
     def get_dataset(self, owner, id):
         resp = self._session.get(
-            to_endpoint_url('/datasets/{}/{}'.format(owner, id))
+            to_endpoint_url('/datasets/{}/{}'.format(owner, id)),
         )
         if resp.status_code == 404:
             return None
@@ -58,21 +59,23 @@ class DwContentsApi(object):
             req = Request(
                 method='GET',
                 url=to_endpoint_url('/user/datasets/{}'.format(scope)),
-                # TODO Specify fields in params when accessLevel is supported
-                params={'limit': 50}
+                # TODO Fix API (accessLevel missing)
+                params={'limit': 50, 'fields': 'id,title,'
+                                               'created,updated'}
             )
 
             dataset_pages = [page for page in self._paginate(req)]
 
             return dataset_pages
 
-        pages = get('own') + get('contributing')
+        pages = get('own') + get('contributing') + get('liked')
         datasets = [d for page in pages for d in page]
-        datasets_rw = [d for d in datasets
-                       if d['accessLevel'] in ['WRITE', 'ADMIN']]
 
-        return sorted(datasets_rw,
-                      key=lambda d: '{}/{}'.format(d['owner'], d['title']))
+        return sorted(
+            unique_justseen(
+                datasets,
+                key=lambda d: (d['owner'], d['id'])),
+            key=lambda d: (d['owner'], d['title']))
 
     def delete_file(self, owner, id, name):
         self._session.delete(
