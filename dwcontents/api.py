@@ -44,6 +44,10 @@ class DwContentsApi(object):
             resp.raise_for_status()
             return resp.json()
 
+    @backoff.on_predicate(
+        backoff.expo,
+        predicate=lambda d: d['status'] not in ['LOADED', 'SYSTEMERROR'],
+        max_tries=lambda: MAX_TRIES)
     def get_dataset(self, owner, dataset_id):
         resp = self._session.get(
             to_endpoint_url('/datasets/{}/{}'.format(owner, dataset_id)),
@@ -78,6 +82,7 @@ class DwContentsApi(object):
             key=lambda d: (d['owner'], d['title']))
 
     def get_notebook(self, owner, dataset_id, file_name):
+        # TODO test file name encoding (incl. subdirs)
         resp = self._session.get(
             to_endpoint_url('/file_download/{}/{}/{}'.format(
                 owner, dataset_id, file_name
@@ -87,7 +92,19 @@ class DwContentsApi(object):
         notebook = resp.json()
         return notebook
 
+    def upload_file(self, owner, dataset_id, file_name, data):
+        # TODO test file name encoding (incl. subdirs)
+        resp = self._session.put(
+            to_endpoint_url('/uploads/{}/{}/files/{}'.format(
+                owner, dataset_id, file_name
+            )),
+            data=data,
+            headers={'Content-Type': 'application/octet-stream'})
+        resp.raise_for_status()
+        return self.get_dataset(owner, dataset_id)
+
     def delete_file(self, owner, dataset_id, file_name):
+        # TODO test file name encoding (incl. subdirs)
         self._session.delete(
             to_endpoint_url('/datasets/{}/{}/files/{}'.format(
                 owner, dataset_id, file_name))
@@ -109,6 +126,20 @@ class DwContentsApi(object):
                 req.params['next'] = page['nextPageToken']
             else:
                 break
+
+    def _poll_until(self, req, test_func,
+                    sleep_secs=1, max_retries=60 * 60):
+        retries = max_retries
+        prep_request = self._session.prepare_request(req)
+        resp = self._session.send(prep_request)
+        while not test_func(resp):
+            retries = retries - 1
+            if retries <= 0:
+                raise TimeoutError()  # TODO specify message
+            sleep(sleep_secs)
+            resp = self._session.send(prep_request)
+            resp.raise_for_status()
+        return resp
 
 
 class BackoffAdapter(BaseAdapter):

@@ -1,3 +1,4 @@
+import json
 import tempfile
 
 from notebook.services.contents.filecheckpoints import GenericFileCheckpoints
@@ -14,6 +15,8 @@ class DwContents(ContentsManager):
         # TODO: Get token from config
         self.api = DwContentsApi(
             'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJwcm9kLXVzZXItY2xpZW50OnJmbHByciIsImlzcyI6ImFnZW50OnJmbHBycjo6OTZmM2VlMGMtNzUzMi00Zjc3LWI0OWQtNmU1ZDY5MDZhYWJjIiwiaWF0IjoxNDg2NTA3OTU1LCJyb2xlIjpbInVzZXJfYXBpX3JlYWQiLCJ1c2VyX2FwaV93cml0ZSJdLCJnZW5lcmFsLXB1cnBvc2UiOnRydWV9.RxIZyvpi9K5zIRWoolgYq3U3c2mhvkc60wgVvAzaPbh7te6OgFCRYgvZiMuz-jQXAd9fO_2JgwHJbaWuPnaGUQ')
+        # TODO: Deal with root dir separate from checkpoints root
+        # TODO: Support hybrid config
         self.root_dir = tempfile.gettempdir()
 
     def dir_exists(self, path):
@@ -32,7 +35,7 @@ class DwContents(ContentsManager):
                 return False
             elif dir_path is not None:
                 for file in dataset['files']:
-                    file_dir, _, _ = file['name'].rpartition('/')
+                    file_dir, _ = DwContents._to_path_parts(file['name'])
                     if file_dir.startswith(dir_path):
                         return True
                 return False
@@ -76,30 +79,51 @@ class DwContents(ContentsManager):
                 # List dataset content
                 dataset = self.api.get_dataset(owner, dataset_id)
                 if file_path is not None:
-                    parent, _, subdir = file_path.rpartition('/')
-                    return map_subdir(subdir, parent, dataset,
+                    dir_parent, dir_name = DwContents._to_path_parts(file_path)
+                    return map_subdir(dir_parent, dir_name, dataset,
                                       include_content=True)
                 else:
                     return map_dataset(dataset, include_content=True)
         else:
             # TODO Why are notebooks marked as files?
-            parent, _, file_name = file_path.rpartition('/')
+            dir_parent, _ = DwContents._to_path_parts(file_path)
             dataset = self.api.get_dataset(owner, dataset_id)
-            file_obj = next(f for f in dataset['files']
-                            if f['name'] == file_path)
+            file_obj = self._get_file(dataset, file_path)
             return map_file(
-                file_obj, parent, dataset,
+                file_obj, dir_parent, dataset,
                 content_func=lambda: self.api.get_notebook(
-                    owner, dataset_id, file_path))
+                    owner, dataset_id, file_path) if content else None)
 
     def rename_file(self, old_path, new_path):
         self.log.debug('[rename_file] Renaming {} to {}'.format(
             old_path, new_path))
-        pass
+
+        if self.dir_exists(old_path):
+            raise DwError('Directory operations are not supported')
+
+        old_file = self.get(old_path, content=True)
+        self.save(old_file, new_path)
+        self.delete_file(old_path)
 
     def save(self, model, path):
-        self.log.debug('[save] Saving {}'.format(path))
-        pass
+        self.log.debug('[save] Saving {} ({})'.format(path, model))
+        self.run_pre_save_hook(model, path)
+        owner, dataset_id, file_path = DwContents._to_dw_path(path)
+        file_dir, _ = DwContents._to_path_parts(file_path)
+        model_type = model['type']
+        if model_type == 'directory':
+            # TODO Allow project creation?
+            # TODO Successful no-op subdir creation?
+            raise DwError('Directory creation is not supported')
+        else:
+            if model_type == 'notebook':
+                updated_dataset = self.api.upload_file(
+                    owner, dataset_id, file_path, json.dumps(model['content']))
+                return map_file(self._get_file(updated_dataset, file_path),
+                                file_dir, updated_dataset)
+            else:
+                # TODO Handle files
+                pass
 
     def delete_file(self, path):
         self.log.debug('[delete_file] Deleting {}'.format(path))
@@ -118,6 +142,10 @@ class DwContents(ContentsManager):
     def _checkpoints_class_default(self):
         return GenericFileCheckpoints
 
+    def _get_file(self, dataset, file_path):
+        return next(f for f in dataset['files']
+                    if f['name'] == file_path)
+
     @staticmethod
     def _to_dw_path(path):
         path_parts = path.strip('/').split('/', 2)
@@ -127,6 +155,11 @@ class DwContents(ContentsManager):
         file_path = path_parts[2] if len(path_parts) > 2 else None
 
         return owner, dataset_id, file_path
+
+    @staticmethod
+    def _to_path_parts(path):
+        directory, _, name = path.rpartition('/')
+        return directory, name
 
     def _guess_type(self, path, allow_directory=True):
         if path.endswith('.ipynb'):

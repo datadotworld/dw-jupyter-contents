@@ -42,7 +42,7 @@ def map_root(me, datasets=None, include_content=False):
         'writable': False,
         'type': 'directory',
         'mimetype': None,
-        'format': 'json',
+        'format': None,
         'created': me['created'],
         'updated': me['updated']
     }
@@ -50,6 +50,7 @@ def map_root(me, datasets=None, include_content=False):
         content = map_accounts(datasets)
         if include_content:
             root['content'] = content
+            root['format'] = 'json'
         root.update(reduce_dates(content))
 
     return root
@@ -71,11 +72,12 @@ def map_account(account, datasets, include_content=False):
         'writable': True,  # TODO confirm
         'type': 'directory',
         'mimetype': None,
-        'format': 'json',
+        'format': None,
     }
     content = map_datasets(datasets)
     if include_content:
         account_entity['content'] = content
+        account_entity['format'] = 'json'
     account_entity.update(reduce_dates(content))
 
     return account_entity
@@ -87,18 +89,19 @@ def map_datasets(datasets):
 
 def map_dataset(dataset, include_content=False):
     dataset_entity = {
-        'name': dataset['title'],
+        'name': dataset['id'],  # TODO revisit other uses of 'title'
         'path': '{}/{}'.format(dataset['owner'], dataset['id']),
         'writable': dataset.get('accessLevel') in ['WRITE', 'ADMIN'],
         'type': 'directory',
         'mimetype': None,
-        'format': 'json',
+        'format': None,
         'created': dataset['created'],
         'last_modified': dataset['updated']
     }
 
     if include_content:
         dataset_entity['content'] = map_items(dataset)
+        dataset_entity['format'] = 'json'
     return dataset_entity
 
 
@@ -138,12 +141,13 @@ def map_subdir(subdir, parent, dataset_obj, include_content=False):
         'writable': dataset_obj.get('accessLevel') in ['WRITE', 'ADMIN'],
         'type': 'directory',
         'mimetype': None,
-        'format': 'json',
+        'format': None,
         'created': dataset_obj['created'],
         'last_modified': dataset_obj['updated']
     }
     if include_content:
         subdir_entity['content'] = map_items(dataset_obj, subdir)
+        subdir_entity['format'] = 'json'
 
     return subdir_entity
 
@@ -160,25 +164,25 @@ def map_file(file_obj, parent, dataset_obj, content_func=None):
                                   file_obj['name']),
         'writable': dataset_obj.get('accessLevel') in ['WRITE', 'ADMIN'],
         'created': file_obj['created'],
-        'last_modified': file_obj['updated']
+        'last_modified': file_obj['updated'],
+        'content': None,
+        'mimetype': None,
+        'format': None
     }
 
     if content_func is not None:
         file_entity['content'] = content_func()
 
     if file_name.endswith('.ipynb'):  # notebook
-        file_entity.update({
-            'type': 'notebook',
-            'mimetype': None,
-            'format': 'json'
-        })
-        if 'content' in file_entity:
+        file_entity['type'] = 'notebook'
+        if file_entity.get('content') is not None:
             # TODO Harden and deal with version migrations
             nb_dict = file_entity['content']
             major = nb_dict.get('nbformat', 1)
             minor = nb_dict.get('nbformat_minor', 0)
             nb = versions[major].to_notebook_json(nb_dict, minor=minor)
             file_entity['content'] = nb
+            file_entity['format'] = 'json'
             nbformat.validate(file_entity['content'])
     else:
         file_entity.update({
