@@ -67,7 +67,8 @@ setup(
     install_requires=[
         'backoff>=1.3.0,<2.0a',
         'certifi>=2017.04.17',
-        'ipython[notebook]>=4.0,<7.0a',
+        'ipython>=4.0,<=5.0.0',
+        'notebook>=4.0,<=5.0.0',
         'requests>=2.0.0,<3.0a',
         'six>=1.5.0,<2.0a',
     ],
@@ -77,10 +78,12 @@ setup(
     tests_require=[
         'coverage>=4.4.2',
         'doublex>=1.8.4,<2.0a',
-        'pyhamcrest>=1.9.0,<2.0a',
-        'responses>=0.5.1,<1.0a',
-        'pytest>=3.0.7,<4.0a',
         'flake8>=2.6.0,<3.4.1a',
+        'nose>=1.3.4,<2.0a',
+        'notebook[test]>=4.0,<=5.0.0',
+        'pyhamcrest>=1.9.0,<2.0a',
+        'pytest>=3.0.7,<4.0a',
+        'responses>=0.5.1,<1.0a',
     ],
     extras_require={
         'pandas': [

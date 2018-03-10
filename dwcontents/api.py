@@ -44,9 +44,9 @@ class DwContentsApi(object):
             resp.raise_for_status()
             return resp.json()
 
-    def get_dataset(self, owner, id):
+    def get_dataset(self, owner, dataset_id):
         resp = self._session.get(
-            to_endpoint_url('/datasets/{}/{}'.format(owner, id)),
+            to_endpoint_url('/datasets/{}/{}'.format(owner, dataset_id)),
         )
         if resp.status_code == 404:
             return None
@@ -77,17 +77,25 @@ class DwContentsApi(object):
                 key=lambda d: (d['owner'], d['id'])),
             key=lambda d: (d['owner'], d['title']))
 
-    def delete_file(self, owner, id, name):
+    def get_notebook(self, owner, dataset_id, file_name):
+        resp = self._session.get(
+            to_endpoint_url('/file_download/{}/{}/{}'.format(
+                owner, dataset_id, file_name
+            ))
+        )
+        resp.raise_for_status()
+        notebook = resp.json()
+        return notebook
+
+    def delete_file(self, owner, dataset_id, file_name):
         self._session.delete(
-            to_endpoint_url(
-                '/datasets/{}/{}/files/{}'.format(owner, id, name)),
-            headers={'Authorization': 'Bearer {}'.format(self.api_token)}
+            to_endpoint_url('/datasets/{}/{}/files/{}'.format(
+                owner, dataset_id, file_name))
         ).raise_for_status()
 
-    def delete_dataset(self, owner, id):
+    def delete_dataset(self, owner, dataset_id):
         self._session.delete(
-            to_endpoint_url('/datasets/{}/{}'.format(owner, id)),
-            headers={'Authorization': 'Bearer {}'.format(self.api_token)}
+            to_endpoint_url('/datasets/{}/{}'.format(owner, dataset_id))
         ).raise_for_status()
 
     def _paginate(self, req):

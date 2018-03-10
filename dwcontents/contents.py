@@ -1,7 +1,11 @@
+import tempfile
+
+from notebook.services.contents.filecheckpoints import GenericFileCheckpoints
 from notebook.services.contents.manager import ContentsManager
 
 from dwcontents.api import DwContentsApi
-from dwcontents.models import map_root, map_account, map_dataset, map_subdir
+from dwcontents.models import map_root, map_account, map_dataset, map_subdir, \
+    map_file
 
 
 class DwContents(ContentsManager):
@@ -10,8 +14,10 @@ class DwContents(ContentsManager):
         # TODO: Get token from config
         self.api = DwContentsApi(
             'eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJwcm9kLXVzZXItY2xpZW50OnJmbHByciIsImlzcyI6ImFnZW50OnJmbHBycjo6OTZmM2VlMGMtNzUzMi00Zjc3LWI0OWQtNmU1ZDY5MDZhYWJjIiwiaWF0IjoxNDg2NTA3OTU1LCJyb2xlIjpbInVzZXJfYXBpX3JlYWQiLCJ1c2VyX2FwaV93cml0ZSJdLCJnZW5lcmFsLXB1cnBvc2UiOnRydWV9.RxIZyvpi9K5zIRWoolgYq3U3c2mhvkc60wgVvAzaPbh7te6OgFCRYgvZiMuz-jQXAd9fO_2JgwHJbaWuPnaGUQ')
+        self.root_dir = tempfile.gettempdir()
 
     def dir_exists(self, path):
+        self.log.debug('[dir_exists] Checking {}'.format(path))
         owner, dataset_id, dir_path = DwContents._to_dw_path(path)
         if dataset_id is None:
             if owner is None:
@@ -34,6 +40,7 @@ class DwContents(ContentsManager):
                 return True
 
     def file_exists(self, path=''):
+        self.log.debug('[file_exists] Checking {}'.format(path))
         owner, dataset_id, file_path = DwContents._to_dw_path(path)
         if owner is None or dataset_id is None:
             return False
@@ -45,44 +52,57 @@ class DwContents(ContentsManager):
                 return file_path in [file['name'] for file in dataset['files']]
 
     def get(self, path, content=True, type=None, format=None):
+        self.log.debug('[get] Getting {}/{}/{}/{}'.format(
+            path, content, type, format))
         owner, dataset_id, file_path = DwContents._to_dw_path(path)
-        self.log.info('Processing request for {}'.format(path))
-        if owner is None:
-            # List root content
-            self.log.info('Processing root')
-            return map_root(self.api.get_me(), self.api.get_datasets(),
-                            include_content=True)
-        elif dataset_id is None:
-            # List account content
-            self.log.info('Processing account {}'.format(owner))
-            return map_account(
-                owner,
-                [d for d in self.api.get_datasets() if d['owner'] == owner],
-                include_content=True)
-        else:
-            if type == 'directory':
+        if type is None:
+            type = self._guess_type(path, True)
+            self.log.debug('[guess_type] Guessed {} type for {}'.format(
+                type, path))
+
+        if type == 'directory':
+            if owner is None:
+                # List root content
+                return map_root(self.api.get_me(), self.api.get_datasets(),
+                                include_content=True)
+            elif dataset_id is None:
+                # List account content
+                return map_account(
+                    owner,
+                    [d for d in self.api.get_datasets()
+                     if d['owner'] == owner],
+                    include_content=True)
+            else:
                 # List dataset content
                 dataset = self.api.get_dataset(owner, dataset_id)
                 if file_path is not None:
                     parent, _, subdir = file_path.rpartition('/')
-                    self.log.info('Processing subdir {} of {}'.format(
-                        subdir, parent
-                    ))
                     return map_subdir(subdir, parent, dataset,
                                       include_content=True)
                 else:
-                    self.log.info('Processing dataset {}'.format(dataset_id))
                     return map_dataset(dataset, include_content=True)
-            else:
-                pass
+        else:
+            # TODO Why are notebooks marked as files?
+            parent, _, file_name = file_path.rpartition('/')
+            dataset = self.api.get_dataset(owner, dataset_id)
+            file_obj = next(f for f in dataset['files']
+                            if f['name'] == file_path)
+            return map_file(
+                file_obj, parent, dataset,
+                content_func=lambda: self.api.get_notebook(
+                    owner, dataset_id, file_path))
 
     def rename_file(self, old_path, new_path):
+        self.log.debug('[rename_file] Renaming {} to {}'.format(
+            old_path, new_path))
         pass
 
     def save(self, model, path):
+        self.log.debug('[save] Saving {}'.format(path))
         pass
 
     def delete_file(self, path):
+        self.log.debug('[delete_file] Deleting {}'.format(path))
         owner, dataset_id, file_path = DwContents._to_dw_path(path)
         if file_path is not None:
             self.api.delete_file(owner, dataset_id, file_path)
@@ -92,7 +112,11 @@ class DwContents(ContentsManager):
             raise DwError('Not authorized to delete {}'.format(path))
 
     def is_hidden(self, path):
+        self.log.debug('[is_hidden] Checking {}'.format(path))
         return False
+
+    def _checkpoints_class_default(self):
+        return GenericFileCheckpoints
 
     @staticmethod
     def _to_dw_path(path):
@@ -103,6 +127,14 @@ class DwContents(ContentsManager):
         file_path = path_parts[2] if len(path_parts) > 2 else None
 
         return owner, dataset_id, file_path
+
+    def _guess_type(self, path, allow_directory=True):
+        if path.endswith('.ipynb'):
+            return 'notebook'
+        elif allow_directory and self.dir_exists(path):
+            return 'directory'
+        else:
+            return 'file'
 
 
 class DwError(Exception):
