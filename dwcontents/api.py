@@ -1,3 +1,4 @@
+import base64
 from time import sleep
 
 import backoff
@@ -81,7 +82,7 @@ class DwContentsApi(object):
                 key=lambda d: (d['owner'], d['id'])),
             key=lambda d: (d['owner'], d['title']))
 
-    def get_notebook(self, owner, dataset_id, file_name):
+    def get_file(self, owner, dataset_id, file_name, format='json'):
         # TODO test file name encoding (incl. subdirs)
         resp = self._session.get(
             to_endpoint_url('/file_download/{}/{}/{}'.format(
@@ -89,8 +90,12 @@ class DwContentsApi(object):
             ))
         )
         resp.raise_for_status()
-        notebook = resp.json()
-        return notebook
+        if format == 'json':
+            return resp.json()
+        elif format == 'base64':
+            return base64.b64encode(resp.content).decode('ascii')
+        else:
+            return resp.content.decode('utf-8')
 
     def upload_file(self, owner, dataset_id, file_name, data):
         # TODO test file name encoding (incl. subdirs)

@@ -1,3 +1,4 @@
+import base64
 import json
 import tempfile
 
@@ -6,7 +7,7 @@ from notebook.services.contents.manager import ContentsManager
 
 from dwcontents.api import DwContentsApi
 from dwcontents.models import map_root, map_account, map_dataset, map_subdir, \
-    map_file
+    map_file, guess_type
 
 
 class DwContents(ContentsManager):
@@ -58,8 +59,9 @@ class DwContents(ContentsManager):
         self.log.debug('[get] Getting {}/{}/{}/{}'.format(
             path, content, type, format))
         owner, dataset_id, file_path = DwContents._to_dw_path(path)
-        if type is None:
-            type = self._guess_type(path, True)
+        if type is None or type == 'file':
+            # TODO Why are notebooks marked as files?
+            type, _, _ = guess_type(path, self.dir_exists)
             self.log.debug('[guess_type] Guessed {} type for {}'.format(
                 type, path))
 
@@ -85,14 +87,24 @@ class DwContents(ContentsManager):
                 else:
                     return map_dataset(dataset, include_content=True)
         else:
-            # TODO Why are notebooks marked as files?
             dir_parent, _ = DwContents._to_path_parts(file_path)
             dataset = self.api.get_dataset(owner, dataset_id)
             file_obj = self._get_file(dataset, file_path)
+            content_func = None
+            if content:
+                if type == 'notebook':
+                    def content_func():
+                        return self.api.get_file(
+                            owner, dataset_id, file_path, 'json')
+                else:
+                    def content_func():
+                        return self.api.get_file(
+                            owner, dataset_id, file_path,
+                            'base64' if format is None else format)
             return map_file(
                 file_obj, dir_parent, dataset,
-                content_func=lambda: self.api.get_notebook(
-                    owner, dataset_id, file_path) if content else None)
+                content_type=type,
+                content_func=content_func)
 
     def rename_file(self, old_path, new_path):
         self.log.debug('[rename_file] Renaming {} to {}'.format(
@@ -117,13 +129,23 @@ class DwContents(ContentsManager):
             raise DwError('Directory creation is not supported')
         else:
             if model_type == 'notebook':
-                updated_dataset = self.api.upload_file(
-                    owner, dataset_id, file_path, json.dumps(model['content']))
-                return map_file(self._get_file(updated_dataset, file_path),
-                                file_dir, updated_dataset)
+                content = json.dumps(model['content']).encode('utf-8')
             else:
-                # TODO Handle files
-                pass
+                model_format = model['format']
+                if model_format == 'base64':
+                    content = (base64
+                               .b64decode(model['content']
+                                          .encode('ascii')))
+                else:
+                    content = model['content'].encode('utf-8')
+
+            updated_dataset = self.api.upload_file(
+                owner, dataset_id, file_path,
+                content)
+
+            return map_file(self._get_file(updated_dataset, file_path),
+                            file_dir, updated_dataset,
+                            content_type=model_type)
 
     def delete_file(self, path):
         self.log.debug('[delete_file] Deleting {}'.format(path))
@@ -161,16 +183,9 @@ class DwContents(ContentsManager):
         directory, _, name = path.rpartition('/')
         return directory, name
 
-    def _guess_type(self, path, allow_directory=True):
-        if path.endswith('.ipynb'):
-            return 'notebook'
-        elif allow_directory and self.dir_exists(path):
-            return 'directory'
-        else:
-            return 'file'
-
 
 class DwError(Exception):
+    # TODO Error handling "best practices"
     def __init__(self, msg):
         self.msg = msg
 

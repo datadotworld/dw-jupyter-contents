@@ -35,6 +35,15 @@ def relative_path(file, parent):
     return file[len(parent):].strip('/')
 
 
+def guess_type(path, dir_exists_func=None):
+    if path.endswith('.ipynb'):
+        return 'notebook', 'json', None
+    elif dir_exists_func is not None and dir_exists_func(path):
+        return 'directory', 'json', None
+    else:
+        return 'file', 'base64', 'application/octet-stream'
+
+
 def map_root(me, datasets=None, include_content=False):
     root = {
         'name': '',
@@ -156,8 +165,12 @@ def map_files(file_objs, parent, dataset_obj):
     return [map_file(file_obj, parent, dataset_obj) for file_obj in file_objs]
 
 
-def map_file(file_obj, parent, dataset_obj, content_func=None):
+def map_file(file_obj, parent, dataset_obj,
+             content_type=None, content_func=None):
     file_name = relative_path(file_obj['name'], parent)
+    gtype, gformat, gmimetype = guess_type(file_obj['name'])
+    if content_type is None:
+        content_type = gtype
     file_entity = {
         'name': file_name,
         'path': '{}/{}/{}'.format(dataset_obj['owner'], dataset_obj['id'],
@@ -166,30 +179,25 @@ def map_file(file_obj, parent, dataset_obj, content_func=None):
         'created': file_obj['created'],
         'last_modified': file_obj['updated'],
         'content': None,
+        'type': content_type,
         'mimetype': None,
         'format': None
     }
 
     if content_func is not None:
-        file_entity['content'] = content_func()
-
-    if file_name.endswith('.ipynb'):  # notebook
-        file_entity['type'] = 'notebook'
-        if file_entity.get('content') is not None:
+        content = content_func()
+        if content_type == 'notebook':  # notebook
             # TODO Harden and deal with version migrations
-            nb_dict = file_entity['content']
-            major = nb_dict.get('nbformat', 1)
-            minor = nb_dict.get('nbformat_minor', 0)
-            nb = versions[major].to_notebook_json(nb_dict, minor=minor)
+            major = content.get('nbformat', 1)
+            minor = content.get('nbformat_minor', 0)
+            nb = versions[major].to_notebook_json(content, minor=minor)
             file_entity['content'] = nb
-            file_entity['format'] = 'json'
+            file_entity['format'] = gformat
             nbformat.validate(file_entity['content'])
-    else:
-        file_entity.update({
-            'type': 'file',
-            'mimetype': 'application/octet-stream',
-            'format': 'base64'
-            # TODO encode file content
-        })
+        else:
+            # TODO Deal with text file types
+            file_entity['content'] = content
+            file_entity['format'] = gformat
+            file_entity['mimetype'] = gmimetype
 
     return file_entity
