@@ -50,6 +50,7 @@ def map_root(me, datasets=None, include_content=False):
         'path': '',
         'writable': False,
         'type': 'directory',
+        'content': None,
         'mimetype': None,
         'format': None,
         'created': me['created'],
@@ -78,8 +79,9 @@ def map_account(account, datasets, include_content=False):
     account_entity = {
         'name': account,
         'path': account,
-        'writable': True,  # TODO confirm
+        'writable': False,
         'type': 'directory',
+        'content': None,
         'mimetype': None,
         'format': None,
     }
@@ -102,6 +104,7 @@ def map_dataset(dataset, include_content=False):
         'path': '{}/{}'.format(dataset['owner'], dataset['id']),
         'writable': dataset.get('accessLevel') in ['WRITE', 'ADMIN'],
         'type': 'directory',
+        'content': None,
         'mimetype': None,
         'format': None,
         'created': dataset['created'],
@@ -149,6 +152,7 @@ def map_subdir(subdir, parent, dataset_obj, include_content=False):
                                   '{}/{}'.format(parent, subdir)),
         'writable': dataset_obj.get('accessLevel') in ['WRITE', 'ADMIN'],
         'type': 'directory',
+        'content': None,
         'mimetype': None,
         'format': None,
         'created': dataset_obj['created'],
