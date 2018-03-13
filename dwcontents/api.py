@@ -1,4 +1,7 @@
 import base64
+from functools import reduce
+
+from future.moves.urllib.parse import quote
 from time import sleep
 
 import backoff
@@ -47,7 +50,9 @@ class DwContentsApi(object):
 
     @backoff.on_predicate(
         backoff.expo,
-        predicate=lambda d: d['status'] not in ['LOADED', 'SYSTEMERROR'],
+        predicate=lambda d: reduce(
+            lambda r, f: r or f.get('sizeInBytes') is None,
+            d.get('files', []), False),
         max_tries=lambda: MAX_TRIES)
     def get_dataset(self, owner, dataset_id):
         resp = self._session.get(
@@ -66,7 +71,7 @@ class DwContentsApi(object):
                 url=to_endpoint_url('/user/datasets/{}'.format(scope)),
                 # TODO Fix API (accessLevel missing)
                 params={'limit': 50, 'fields': 'id,title,'
-                                               'created,updated'}
+                                               'accessLevel,created,updated'}
             )
 
             dataset_pages = [page for page in self._paginate(req)]
@@ -76,17 +81,14 @@ class DwContentsApi(object):
         pages = get('own') + get('contributing') + get('liked')
         datasets = [d for page in pages for d in page]
 
-        return sorted(
-            unique_justseen(
+        return unique_justseen(
                 datasets,
-                key=lambda d: (d['owner'], d['id'])),
-            key=lambda d: (d['owner'], d['title']))
+                key=lambda d: (d['owner'], d['id']))
 
     def get_file(self, owner, dataset_id, file_name, format='json'):
-        # TODO test file name encoding (incl. subdirs)
         resp = self._session.get(
             to_endpoint_url('/file_download/{}/{}/{}'.format(
-                owner, dataset_id, file_name
+                owner, dataset_id, quote(file_name, safe='')
             ))
         )
         resp.raise_for_status()
@@ -98,10 +100,10 @@ class DwContentsApi(object):
             return resp.content.decode('utf-8')
 
     def upload_file(self, owner, dataset_id, file_name, data):
-        # TODO test file name encoding (incl. subdirs)
+        # TODO Fix API (support for files in subdirectories)
         resp = self._session.put(
             to_endpoint_url('/uploads/{}/{}/files/{}'.format(
-                owner, dataset_id, file_name
+                owner, dataset_id, quote(file_name, safe='')
             )),
             data=data,
             headers={'Content-Type': 'application/octet-stream'})
@@ -109,10 +111,9 @@ class DwContentsApi(object):
         return self.get_dataset(owner, dataset_id)
 
     def delete_file(self, owner, dataset_id, file_name):
-        # TODO test file name encoding (incl. subdirs)
         self._session.delete(
             to_endpoint_url('/datasets/{}/{}/files/{}'.format(
-                owner, dataset_id, file_name))
+                owner, dataset_id, quote(file_name, safe='')))
         ).raise_for_status()
 
     def delete_dataset(self, owner, dataset_id):
@@ -131,20 +132,6 @@ class DwContentsApi(object):
                 req.params['next'] = page['nextPageToken']
             else:
                 break
-
-    def _poll_until(self, req, test_func,
-                    sleep_secs=1, max_retries=60 * 60):
-        retries = max_retries
-        prep_request = self._session.prepare_request(req)
-        resp = self._session.send(prep_request)
-        while not test_func(resp):
-            retries = retries - 1
-            if retries <= 0:
-                raise TimeoutError()  # TODO specify message
-            sleep(sleep_secs)
-            resp = self._session.send(prep_request)
-            resp.raise_for_status()
-        return resp
 
 
 class BackoffAdapter(BaseAdapter):

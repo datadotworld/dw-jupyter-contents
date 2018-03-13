@@ -8,8 +8,7 @@ from notebook.services.contents.manager import ContentsManager
 from traitlets import Unicode
 
 from dwcontents.api import DwContentsApi
-from dwcontents.models import map_root, map_account, map_dataset, map_subdir, \
-    map_file, guess_type
+from dwcontents.models import guess_type, DwMapper
 
 
 class DwContents(ContentsManager):
@@ -24,8 +23,9 @@ class DwContents(ContentsManager):
 
         os.environ['DW_AUTH_TOKEN'] = self.dw_auth_token
         self.api = DwContentsApi(self.dw_auth_token)
+        self.mapper = DwMapper(root_dir=self.root_dir, logger=self.log)
 
-        # TODO: Support hybrid config
+        # TODO Support hybrid config
 
     def dir_exists(self, path):
         self.log.debug('[dir_exists] Checking {}'.format(path))
@@ -66,11 +66,6 @@ class DwContents(ContentsManager):
         self.log.debug('[get] Getting {}/{}/{}/{}'.format(
             path, content, type, format))
 
-        if path == '':
-            path = self.root_dir
-
-        # TODO Map paths relative to root_dir
-
         owner, dataset_id, file_path = self._to_dw_path(path)
         if type is None:
             type, _, _ = guess_type(path, self.dir_exists)
@@ -80,11 +75,12 @@ class DwContents(ContentsManager):
         if type == 'directory':
             if owner is None:
                 # List root content
-                return map_root(self.api.get_me(), self.api.get_datasets(),
+                return self.mapper.map_root(self.api.get_me(),
+                                datasets=self.api.get_datasets(),
                                 include_content=content)
             elif dataset_id is None:
                 # List account content
-                return map_account(
+                return self.mapper.map_account(
                     owner,
                     [d for d in self.api.get_datasets()
                      if d['owner'] == owner],
@@ -94,10 +90,11 @@ class DwContents(ContentsManager):
                 dataset = self.api.get_dataset(owner, dataset_id)
                 if file_path is not None:
                     dir_parent, dir_name = DwContents._split_parent(file_path)
-                    return map_subdir(dir_parent, dir_name, dataset,
-                                      include_content=content)
+                    return self.mapper.map_subdir(
+                        dir_name, dir_parent, dataset, include_content=content)
                 else:
-                    return map_dataset(dataset, include_content=content)
+                    return self.mapper.map_dataset(
+                        dataset, include_content=content)
         else:
             if file_path is None:
                 raise DwError  # TODO Proper error
@@ -116,7 +113,7 @@ class DwContents(ContentsManager):
                         return self.api.get_file(
                             owner, dataset_id, file_path,
                             'base64' if format is None else format)
-            return map_file(
+            return self.mapper.map_file(
                 file_obj, dir_parent, dataset,
                 content_type=type,
                 content_func=content_func)
@@ -171,9 +168,10 @@ class DwContents(ContentsManager):
                 owner, dataset_id, file_path,
                 content)
 
-            return map_file(self._get_file(updated_dataset, file_path),
-                            file_dir, updated_dataset,
-                            content_type=model_type)
+            return self.mapper.map_file(
+                self._get_file(updated_dataset, file_path),
+                file_dir, updated_dataset,
+                content_type=model_type)
 
     def delete_file(self, path):
         self.log.debug('[delete_file] Deleting {}'.format(path))
@@ -187,21 +185,28 @@ class DwContents(ContentsManager):
         self.log.debug('[is_hidden] Checking {}'.format(path))
         return False  # Nothing is hidden
 
+    @property
+    def root_path(self):
+        return self.root_dir.strip('/')
+
+    # noinspection PyMethodMayBeStatic
     def _checkpoints_class_default(self):
         return GenericFileCheckpoints
 
+    # noinspection PyMethodMayBeStatic
     def _checkpoints_kwargs_default(self):
         kw = {
             'root_dir': tempfile.gettempdir()
         }
         return kw
 
-    def _get_file(self, dataset, file_path):
-        return next((f for f in dataset['files']
-                     if f['name'] == file_path), None)
-
     def _to_dw_path(self, path):
-        path_parts = path.strip('/').split('/', 2)
+        if path == '':
+            path = self.root_dir.strip('/')
+        else:
+            path = '{}/{}'.format(self.root_dir.strip('/'), path.strip('/'))
+
+        path_parts = path.split('/', 2)
 
         owner = path_parts[0] if path_parts[0] != '' else None
         dataset_id = path_parts[1] if len(path_parts) > 1 else None
@@ -211,6 +216,11 @@ class DwContents(ContentsManager):
             owner, dataset_id, file_path))
 
         return owner, dataset_id, file_path
+
+    @staticmethod
+    def _get_file(dataset, file_path):
+        return next((f for f in dataset['files']
+                     if f['name'] == file_path), None)
 
     @staticmethod
     def _split_parent(path):
