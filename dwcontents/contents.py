@@ -5,10 +5,29 @@ import tempfile
 
 from notebook.services.contents.filecheckpoints import GenericFileCheckpoints
 from notebook.services.contents.manager import ContentsManager
+from tornado.web import HTTPError
 from traitlets import Unicode
 
 from dwcontents.api import DwContentsApi
-from dwcontents.models import guess_type, DwMapper
+from dwcontents.models import guess_type, DwMapper, guess_format
+from dwcontents.utils import to_dw_path, split_parent, normalize_path, \
+    directory_path
+
+
+def http_400(msg):
+    raise HTTPError(400, msg)
+
+
+def http_403(msg):
+    raise HTTPError(403, msg)
+
+
+def http_404(msg):
+    raise HTTPError(404, msg)
+
+
+def http_409(msg):
+    raise HTTPError(409, msg)
 
 
 class DwContents(ContentsManager):
@@ -22,8 +41,10 @@ class DwContents(ContentsManager):
         super(DwContents, self).__init__(**kwargs)
 
         os.environ['DW_AUTH_TOKEN'] = self.dw_auth_token
-        self.api = DwContentsApi(self.dw_auth_token)
+        self.root_dir = normalize_path(self.root_dir)
+        self.api = kwargs.get('api', DwContentsApi(self.dw_auth_token))
         self.mapper = DwMapper(root_dir=self.root_dir, logger=self.log)
+        self.compatibility_mode = kwargs.get('compatibility_mode', False)
 
         # TODO Support hybrid config
 
@@ -42,9 +63,9 @@ class DwContents(ContentsManager):
             if dataset is None:
                 return False
             elif dir_path is not None:
-                for file in dataset['files']:
-                    file_dir, _ = DwContents._split_parent(file['name'])
-                    if file_dir.startswith(dir_path):
+                for file in dataset.get('files', []):
+                    file_dir, _ = split_parent(file['name'])
+                    if file_dir.startswith(directory_path(dir_path)):
                         return True
                 return False
             else:
@@ -68,16 +89,19 @@ class DwContents(ContentsManager):
 
         owner, dataset_id, file_path = self._to_dw_path(path)
         if type is None:
-            type, _, _ = guess_type(path, self.dir_exists)
+            type = guess_type(path, self.dir_exists)
             self.log.debug('[guess_type] Guessed {} type for {}'.format(
                 type, path))
 
         if type == 'directory':
+            if not self.dir_exists(path):
+                raise http_404('No such entity')
+
             if owner is None:
                 # List root content
                 return self.mapper.map_root(self.api.get_me(),
-                                datasets=self.api.get_datasets(),
-                                include_content=content)
+                                            datasets=self.api.get_datasets(),
+                                            include_content=content)
             elif dataset_id is None:
                 # List account content
                 return self.mapper.map_account(
@@ -89,7 +113,7 @@ class DwContents(ContentsManager):
                 # List dataset content
                 dataset = self.api.get_dataset(owner, dataset_id)
                 if file_path is not None:
-                    dir_parent, dir_name = DwContents._split_parent(file_path)
+                    dir_parent, dir_name = split_parent(file_path)
                     return self.mapper.map_subdir(
                         dir_name, dir_parent, dataset, include_content=content)
                 else:
@@ -97,38 +121,62 @@ class DwContents(ContentsManager):
                         dataset, include_content=content)
         else:
             if file_path is None:
-                raise DwError  # TODO Proper error
+                http_400('Wrong type. {} is not a file.'.format(path))
 
-            dir_parent, _ = DwContents._split_parent(file_path)
+            if not self.file_exists(path):
+                http_404('No such entity')
+
+            dir_parent, _ = split_parent(file_path)
             dataset = self.api.get_dataset(owner, dataset_id)
             file_obj = self._get_file(dataset, file_path)
             content_func = None
             if content:
                 if type == 'notebook':
                     def content_func():
-                        return self.api.get_file(
+                        nb = self.api.get_file(
                             owner, dataset_id, file_path, 'json')
+                        self.mark_trusted_cells(nb, path)
+                        return nb
                 else:
                     def content_func():
                         return self.api.get_file(
                             owner, dataset_id, file_path,
-                            'base64' if format is None else format)
-            return self.mapper.map_file(
+                            guess_format(file_path, type)
+                            if format is None else format)
+
+            model = self.mapper.map_file(
                 file_obj, dir_parent, dataset,
                 content_type=type,
+                content_format=format,
                 content_func=content_func)
+
+            if content and model['type'] == 'notebook':
+                self.validate_notebook_model(model)
+
+            return model
 
     def rename_file(self, old_path, new_path):
         self.log.debug('[rename_file] Renaming {} to {}'.format(
             old_path, new_path))
 
-        owner, dataset_id, file_path = self._to_dw_path(new_path)
-        if file_path is None:
-            raise DwError()  # TODO Proper error
+        if old_path == '':  # TODO same for prefix
+            http_409('Cannot rename root')
 
-        if self.dir_exists(old_path):  # Is it a directory?
-            # TODO Raise error if not testing
-            return  # Moving dirs no-ops for testing
+        if self.exists(new_path):
+            http_409('File already exists ({})'.format(new_path))
+
+        owner, dataset_id, file_path = self._to_dw_path(new_path)
+        if file_path is None or self.dir_exists(old_path):
+            if self.compatibility_mode:
+                dataset = self.api.get_dataset(owner, dataset_id)
+                for f in dataset.get('files', []):
+                    parent = directory_path(old_path)
+                    if f['name'].startswith(parent):
+                        self.rename_file(
+                            f['name'],
+                            normalize_path(new_path, f['name'][len(parent):]))
+            else:
+                http_403('Only files can be renamed')
 
         old_file = self.get(old_path, content=True)
         self.save(old_file, new_path)
@@ -139,21 +187,24 @@ class DwContents(ContentsManager):
         self.run_pre_save_hook(model, path)
 
         owner, dataset_id, file_path = self._to_dw_path(path)
-        file_dir, _ = DwContents._split_parent(file_path)
+        file_dir, _ = split_parent(file_path)
 
         model_type = model['type']
         if model_type == 'directory':
-            if file_path is None:
-                raise DwError()  # TODO Proper error
+            if self.compatibility_mode:
+                self.api.upload_file(
+                    owner, dataset_id,
+                    normalize_path(file_path, 'dummy'), '')
+                return self.mapper.map_subdir(
+                    file_path, '', self.api.get_dataset(owner, dataset_id))
             else:
-                # Saving dirs no-ops for testing
-                # TODO Raise error if not testing
-                return self.get(path, content=False, type='directory')
+                http_403('Only files can be saved.')
         else:
-            if file_path is None:
-                raise DwError()  # TODO Proper error
+            if file_path is None or self.dir_exists(path):
+                http_400('Wrong type. {} is not a file.'.format(path))
 
             if model_type == 'notebook':
+                self.check_and_sign(model['content'], path)
                 content = json.dumps(model['content']).encode('utf-8')
             else:
                 model_format = model['format']
@@ -171,23 +222,26 @@ class DwContents(ContentsManager):
             return self.mapper.map_file(
                 self._get_file(updated_dataset, file_path),
                 file_dir, updated_dataset,
-                content_type=model_type)
+                content_type=model_type,
+                content_format=model['format'])
 
     def delete_file(self, path):
         self.log.debug('[delete_file] Deleting {}'.format(path))
         owner, dataset_id, file_path = self._to_dw_path(path)
         if file_path is not None:
-            self.api.delete_file(owner, dataset_id, file_path)
+            if not self.exists(path):
+                http_404('No such entity.')
+
+            if guess_type(path, self.dir_exists) != 'directory':
+                self.api.delete_file(owner, dataset_id, file_path)
+            else:
+                self.api.delete_directory(owner, dataset_id, file_path)
         else:
-            raise DwError()  # TODO Proper error
+            http_403('Only dataset contents can be deleted.')
 
     def is_hidden(self, path):
         self.log.debug('[is_hidden] Checking {}'.format(path))
         return False  # Nothing is hidden
-
-    @property
-    def root_path(self):
-        return self.root_dir.strip('/')
 
     # noinspection PyMethodMayBeStatic
     def _checkpoints_class_default(self):
@@ -201,37 +255,12 @@ class DwContents(ContentsManager):
         return kw
 
     def _to_dw_path(self, path):
-        if path == '':
-            path = self.root_dir.strip('/')
-        else:
-            path = '{}/{}'.format(self.root_dir.strip('/'), path.strip('/'))
-
-        path_parts = path.split('/', 2)
-
-        owner = path_parts[0] if path_parts[0] != '' else None
-        dataset_id = path_parts[1] if len(path_parts) > 1 else None
-        file_path = path_parts[2] if len(path_parts) > 2 else None
-
-        self.log.debug('[_to_dw_path] o:{} d:{} f:{}'.format(
-            owner, dataset_id, file_path))
-
-        return owner, dataset_id, file_path
+        self.log.debug('[_to_dw_path] p:{} r:{}'.format(path, self.root_dir))
+        return to_dw_path(path, self.root_dir)
 
     @staticmethod
     def _get_file(dataset, file_path):
-        return next((f for f in dataset['files']
+        file_path = normalize_path(file_path)
+        return next((f for f in dataset.get('files', [])
                      if f['name'] == file_path), None)
 
-    @staticmethod
-    def _split_parent(path):
-        parent, _, name = path.rpartition('/')
-        return parent, name
-
-
-class DwError(Exception):
-    # TODO Error handling "best practices"
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg

@@ -1,21 +1,29 @@
 import base64
 from functools import reduce
-
-from future.moves.urllib.parse import quote
 from time import sleep
 
 import backoff
+from future.moves.urllib.parse import quote
+from nbformat import v1, v2, v3, v4
 from requests import Request, Session
 from requests.adapters import BaseAdapter, HTTPAdapter
 
 from dwcontents import __version__
-from dwcontents.utils import unique_justseen
+from dwcontents.utils import unique_justseen, directory_path
 
 MAX_TRIES = 10  # necessary to configure backoff decorator
 
 
 def to_endpoint_url(endpoint):
     return 'https://api.data.world/v0{}'.format(endpoint)
+
+
+versions = {
+    1: v1,
+    2: v2,
+    3: v3,
+    4: v4,
+}
 
 
 class DwContentsApi(object):
@@ -81,9 +89,9 @@ class DwContentsApi(object):
         pages = get('own') + get('contributing') + get('liked')
         datasets = [d for page in pages for d in page]
 
-        return unique_justseen(
-                datasets,
-                key=lambda d: (d['owner'], d['id']))
+        return list(unique_justseen(
+            datasets,
+            key=lambda d: (d['owner'], d['id'])))
 
     def get_file(self, owner, dataset_id, file_name, format='json'):
         resp = self._session.get(
@@ -92,12 +100,7 @@ class DwContentsApi(object):
             ))
         )
         resp.raise_for_status()
-        if format == 'json':
-            return resp.json()
-        elif format == 'base64':
-            return base64.b64encode(resp.content).decode('ascii')
-        else:
-            return resp.content.decode('utf-8')
+        return self._decode_response(resp, format)
 
     def upload_file(self, owner, dataset_id, file_name, data):
         # TODO Fix API (support for files in subdirectories)
@@ -110,6 +113,12 @@ class DwContentsApi(object):
         resp.raise_for_status()
         return self.get_dataset(owner, dataset_id)
 
+    def delete_directory(self, owner, dataset_id, directory_name):
+        dataset = self.get_dataset(owner, dataset_id)
+        for f in dataset.get('files', []):
+            if f['name'].startswith(directory_path(directory_name)):
+                self.delete_file(owner, dataset_id, f['name'])
+
     def delete_file(self, owner, dataset_id, file_name):
         self._session.delete(
             to_endpoint_url('/datasets/{}/{}/files/{}'.format(
@@ -120,6 +129,19 @@ class DwContentsApi(object):
         self._session.delete(
             to_endpoint_url('/datasets/{}/{}'.format(owner, dataset_id))
         ).raise_for_status()
+
+    def _decode_response(self, resp, format):
+        if format == 'json':
+            content = resp.json()
+            major = content.get('nbformat', 1)
+            minor = content.get('nbformat_minor', 0)
+            nb = versions[major].to_notebook_json(content, minor=minor)
+            # TODO Harden and deal with version migrations
+            return nb
+        elif format == 'base64':
+            return base64.b64encode(resp.content).decode('ascii')
+        else:
+            return resp.content.decode('utf-8')
 
     def _paginate(self, req):
         while True:
