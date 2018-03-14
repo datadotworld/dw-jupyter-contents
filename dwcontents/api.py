@@ -48,7 +48,7 @@ class DwContentsApi(object):
 
     def get_user(self, user):
         resp = self._session.get(
-            to_endpoint_url('/user/{}'.format(user))
+            to_endpoint_url('/users/{}'.format(user))
         )
         if resp.status_code == 404:
             return None
