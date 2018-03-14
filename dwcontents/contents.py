@@ -1,7 +1,28 @@
+# dwcontents
+# Copyright 2018 data.world, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the
+# License.
+#
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
+#
+# This product includes software developed at
+# data.world, Inc.(http://data.world/).
+from __future__ import unicode_literals
+
 import base64
 import json
 import os
 import tempfile
+from builtins import str
 
 from notebook.services.contents.filecheckpoints import GenericFileCheckpoints
 from notebook.services.contents.manager import ContentsManager
@@ -11,7 +32,9 @@ from traitlets import Unicode
 from dwcontents.api import DwContentsApi
 from dwcontents.models import guess_type, DwMapper, guess_format
 from dwcontents.utils import to_dw_path, split_parent, normalize_path, \
-    directory_path
+    directory_path, to_nb_json
+
+str('Use str() once to force PyCharm to keep import')
 
 
 def http_400(msg):
@@ -40,11 +63,21 @@ class DwContents(ContentsManager):
     def __init__(self, **kwargs):
         super(DwContents, self).__init__(**kwargs)
 
-        os.environ['DW_AUTH_TOKEN'] = self.dw_auth_token
-        self.root_dir = normalize_path(self.root_dir)
-        self.api = kwargs.get('api', DwContentsApi(self.dw_auth_token))
-        self.mapper = DwMapper(root_dir=self.root_dir, logger=self.log)
+        # Configuration
+        token = self.dw_auth_token
+        root_dir = getattr(self, 'root_dir', '/')
+        logger = self.log
+
+        # Testing options
+        self.api = kwargs.get('api', DwContentsApi(token))
         self.compatibility_mode = kwargs.get('compatibility_mode', False)
+
+        # Final setup
+        self.root_dir = normalize_path(root_dir)
+        self.mapper = DwMapper(root_dir=root_dir, logger=logger)
+
+        # Share token with datadotworld package
+        os.environ['DW_AUTH_TOKEN'] = token
 
         # TODO Support hybrid config
 
@@ -119,16 +152,14 @@ class DwContents(ContentsManager):
                 else:
                     return self.mapper.map_dataset(
                         dataset, include_content=content)
-        else:
+
+        else:  # File or notebook
             if file_path is None:
                 http_400('Wrong type. {} is not a file.'.format(path))
 
             if not self.file_exists(path):
                 http_404('No such entity')
 
-            dir_parent, _ = split_parent(file_path)
-            dataset = self.api.get_dataset(owner, dataset_id)
-            file_obj = self._get_file(dataset, file_path)
             content_func = None
             if content:
                 if type == 'notebook':
@@ -143,6 +174,10 @@ class DwContents(ContentsManager):
                             owner, dataset_id, file_path,
                             guess_format(file_path, type)
                             if format is None else format)
+
+            dataset = self.api.get_dataset(owner, dataset_id)
+            file_obj = self._get_file(dataset, file_path)
+            dir_parent, _ = split_parent(file_path)
 
             model = self.mapper.map_file(
                 file_obj, dir_parent, dataset,
@@ -159,7 +194,7 @@ class DwContents(ContentsManager):
         self.log.debug('[rename_file] Renaming {} to {}'.format(
             old_path, new_path))
 
-        if old_path == '':  # TODO same for prefix
+        if old_path == '':
             http_409('Cannot rename root')
 
         if self.exists(new_path):
@@ -167,6 +202,7 @@ class DwContents(ContentsManager):
 
         owner, dataset_id, file_path = self._to_dw_path(new_path)
         if file_path is None or self.dir_exists(old_path):
+            # This is an account, dataset/project or subdirectory
             if self.compatibility_mode:
                 dataset = self.api.get_dataset(owner, dataset_id)
                 for f in dataset.get('files', []):
@@ -187,10 +223,8 @@ class DwContents(ContentsManager):
         self.run_pre_save_hook(model, path)
 
         owner, dataset_id, file_path = self._to_dw_path(path)
-        file_dir, _ = split_parent(file_path)
 
-        model_type = model['type']
-        if model_type == 'directory':
+        if model['type'] == 'directory':
             if self.compatibility_mode:
                 self.api.upload_file(
                     owner, dataset_id,
@@ -203,8 +237,8 @@ class DwContents(ContentsManager):
             if file_path is None or self.dir_exists(path):
                 http_400('Wrong type. {} is not a file.'.format(path))
 
-            if model_type == 'notebook':
-                self.check_and_sign(model['content'], path)
+            if model['type'] == 'notebook':
+                self.check_and_sign(to_nb_json(model['content']), path)
                 content = json.dumps(model['content']).encode('utf-8')
             else:
                 model_format = model['format']
@@ -219,25 +253,27 @@ class DwContents(ContentsManager):
                 owner, dataset_id, file_path,
                 content)
 
+            file_dir, _ = split_parent(file_path)
             return self.mapper.map_file(
                 self._get_file(updated_dataset, file_path),
                 file_dir, updated_dataset,
-                content_type=model_type,
-                content_format=model['format'])
+                content_type=(model['type']),
+                content_format=model.get('format'))
 
     def delete_file(self, path):
         self.log.debug('[delete_file] Deleting {}'.format(path))
         owner, dataset_id, file_path = self._to_dw_path(path)
-        if file_path is not None:
-            if not self.exists(path):
-                http_404('No such entity.')
-
-            if guess_type(path, self.dir_exists) != 'directory':
-                self.api.delete_file(owner, dataset_id, file_path)
-            else:
-                self.api.delete_directory(owner, dataset_id, file_path)
-        else:
+        if file_path is None:
+            # This is an account or dataset/project
             http_403('Only dataset contents can be deleted.')
+
+        if not self.exists(path):
+            http_404('No such entity.')
+
+        if guess_type(path, self.dir_exists) != 'directory':
+            self.api.delete_file(owner, dataset_id, file_path)
+        else:
+            self.api.delete_subdirectory(owner, dataset_id, file_path)
 
     def is_hidden(self, path):
         self.log.debug('[is_hidden] Checking {}'.format(path))
@@ -263,4 +299,3 @@ class DwContents(ContentsManager):
         file_path = normalize_path(file_path)
         return next((f for f in dataset.get('files', [])
                      if f['name'] == file_path), None)
-

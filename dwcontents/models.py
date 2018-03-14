@@ -1,8 +1,41 @@
+# dwcontents
+# Copyright 2018 data.world, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the
+# License.
+#
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
+#
+# This product includes software developed at
+# data.world, Inc.(http://data.world/).
+from __future__ import unicode_literals
+
 import logging
+from builtins import str
 from functools import reduce
 from itertools import groupby
 
 from dwcontents.utils import to_api_path, relative_path, normalize_path
+
+str('Use str() once to force PyCharm to keep import')
+
+
+def create_model(overrides={}):
+    base_model = {
+        'content': None,
+        'format': None,
+        'mimetype': None
+    }
+    base_model.update(overrides)
+    return base_model
 
 
 def guess_type(path, dir_exists_func=None):
@@ -62,25 +95,22 @@ class DwMapper(object):
     def map_root(self, me, datasets=None, include_content=False):
         self.log.debug('[map_root] me:{} d(count):{} c:{}'.format(
             me['id'], len(datasets), include_content))
-        root = {
+        root_model = create_model({
+            'type': 'directory',
             'name': '',
             'path': '',
             'writable': False,
-            'type': 'directory',
-            'content': None,
-            'mimetype': None,
-            'format': None,
             'created': me['created'],
             'updated': me['updated']
-        }
+        })
         if datasets is not None:
             content = self.map_accounts(datasets)
             if include_content:
-                root['content'] = content
-                root['format'] = 'json'
-            root.update(reduce_dates(content))
+                root_model['content'] = content
+                root_model['format'] = 'json'
+            root_model.update(reduce_dates(content))
 
-        return root
+        return root_model
 
     def map_accounts(self, datasets):
         self.log.debug('[map_accounts] d(count):{}'.format(len(datasets)))
@@ -94,22 +124,21 @@ class DwMapper(object):
     def map_account(self, account, datasets, include_content=False):
         self.log.debug('[map_account] a:{} d(count):{} c:{}'.format(
             account, len(datasets), include_content))
-        account_entity = {
+        account_dir_model = create_model({
+            'type': 'directory',
             'name': account,
             'path': self._api_path(account),
-            'writable': False,
-            'type': 'directory',
-            'content': None,
-            'mimetype': None,
-            'format': None,
-        }
-        content = self.map_datasets(datasets)
-        if include_content:
-            account_entity['content'] = content
-            account_entity['format'] = 'json'
-        account_entity.update(reduce_dates(content))
+            'writable': False
+        })
 
-        return account_entity
+        content = self.map_datasets(datasets)
+        account_dir_model.update(reduce_dates(content))
+
+        if include_content:
+            account_dir_model['content'] = content
+            account_dir_model['format'] = 'json'
+
+        return account_dir_model
 
     def map_datasets(self, datasets):
         self.log.debug('[map_datasets] d(count):{}'.format(len(datasets)))
@@ -118,23 +147,21 @@ class DwMapper(object):
     def map_dataset(self, dataset, include_content=False):
         self.log.debug('[map_dataset] d:{} c:{}'.format(dataset['id'],
                                                         include_content))
-        dataset_entity = {
+        dataset_dir_model = create_model({
+            'type': 'directory',
             'name': dataset['id'],
             'path': self._api_path(
                 normalize_path(dataset['owner'], dataset['id'])),
             'writable': dataset.get('accessLevel') in ['WRITE', 'ADMIN'],
-            'type': 'directory',
-            'content': None,
-            'mimetype': None,
-            'format': None,
             'created': dataset['created'],
             'last_modified': dataset['updated']
-        }
+        })
 
         if include_content:
-            dataset_entity['content'] = self.map_items(dataset)
-            dataset_entity['format'] = 'json'
-        return dataset_entity
+            dataset_dir_model['content'] = self.map_items(dataset)
+            dataset_dir_model['format'] = 'json'
+
+        return dataset_dir_model
 
     def map_items(self, dataset, parent=''):
         self.log.debug('[map_items] d:{} s{}'.format(dataset['id'], parent))
@@ -168,7 +195,8 @@ class DwMapper(object):
     def map_subdir(self, subdir, parent, dataset_obj, include_content=False):
         self.log.debug('[map_subdir] s:{} p:{} d:{} c:{}'.format(
             subdir, parent, dataset_obj['id'], include_content))
-        subdir_entity = {
+        subdir_model = create_model({
+            'type': 'directory',
             'name': subdir,
             'path': self._api_path(
                 normalize_path(
@@ -176,19 +204,16 @@ class DwMapper(object):
                     subdir if parent == '' else normalize_path(parent,
                                                                subdir))),
             'writable': dataset_obj.get('accessLevel') in ['WRITE', 'ADMIN'],
-            'type': 'directory',
-            'content': None,
-            'mimetype': None,
-            'format': None,
             'created': dataset_obj['created'],
             'last_modified': dataset_obj['updated']
-        }
-        if include_content:
-            subdir_entity['content'] = self.map_items(
-                dataset_obj, parent=normalize_path(parent, subdir))
-            subdir_entity['format'] = 'json'
+        })
 
-        return subdir_entity
+        if include_content:
+            subdir_model['content'] = self.map_items(
+                dataset_obj, parent=normalize_path(parent, subdir))
+            subdir_model['format'] = 'json'
+
+        return subdir_model
 
     def map_files(self, file_objs, parent, dataset_obj):
         self.log.debug('[map_files] f(count):{} p:{} d:{}'.format(
@@ -208,15 +233,8 @@ class DwMapper(object):
         gtype = guess_type(file_obj['name'])
         content_type = content_type if content_type is not None else gtype
 
-        gformat = guess_format(file_obj['name'], content_type)
-        content_format = (content_format
-                          if content_format is not None else gformat)
-        content_mimetype = {
-            'text': 'text/plain',
-            'base64': 'application/octet-stream'
-        }.get(content_format)
-
-        file_entity = {
+        file_model = create_model({
+            'type': content_type,
             'name': file_name,
             'path': self._api_path(
                 normalize_path(
@@ -224,21 +242,25 @@ class DwMapper(object):
                     file_obj['name'])),
             'writable': dataset_obj.get('accessLevel') in ['WRITE', 'ADMIN'],
             'created': file_obj['created'],
-            'last_modified': file_obj['updated'],
-            'content': None,
-            'type': content_type,
-            'mimetype': None,
-            'format': None
-        }
+            'last_modified': file_obj['updated']
+        })
 
         if content_func is not None:
             content = content_func()
-            file_entity['content'] = content
-            file_entity['format'] = content_format
-            file_entity['mimetype'] = content_mimetype
 
-        return file_entity
+            gformat = guess_format(file_obj['name'], content_type)
+            content_format = (content_format
+                              if content_format is not None else gformat)
+            content_mimetype = {
+                'text': 'text/plain',
+                'base64': 'application/octet-stream'
+            }.get(content_format)
+
+            file_model['content'] = content
+            file_model['format'] = content_format
+            file_model['mimetype'] = content_mimetype
+
+        return file_model
 
     def _api_path(self, dw_path):
-        # TODO implement prefix (hybrid contents manager)
         return to_api_path(dw_path, self.root_dir)

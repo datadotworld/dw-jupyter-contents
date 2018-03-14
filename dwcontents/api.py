@@ -1,15 +1,38 @@
+# dwcontents
+# Copyright 2018 data.world, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the
+# License.
+#
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
+#
+# This product includes software developed at
+# data.world, Inc.(http://data.world/).
+from __future__ import unicode_literals
+
 import base64
+from builtins import str
 from functools import reduce
 from time import sleep
 
 import backoff
+import tornado
 from future.moves.urllib.parse import quote
-from nbformat import v1, v2, v3, v4
-from requests import Request, Session
+from requests import Request, Session, HTTPError
 from requests.adapters import BaseAdapter, HTTPAdapter
 
 from dwcontents import __version__
-from dwcontents.utils import unique_justseen, directory_path
+from dwcontents.utils import unique_justseen, directory_path, to_nb_json
+
+str('Use str() once to force PyCharm to keep import')
 
 MAX_TRIES = 10  # necessary to configure backoff decorator
 
@@ -18,12 +41,16 @@ def to_endpoint_url(endpoint):
     return 'https://api.data.world/v0{}'.format(endpoint)
 
 
-versions = {
-    1: v1,
-    2: v2,
-    3: v3,
-    4: v4,
-}
+def map_exceptions(fn):
+    def decorated(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except HTTPError as e:
+            raise tornado.web.HTTPError(
+                e.response.status_code, e.response.reason)
+
+    decorated.__doc__ = fn.__doc__
+    return decorated
 
 
 class DwContentsApi(object):
@@ -39,6 +66,7 @@ class DwContentsApi(object):
         self._session.mount('https://api.data.world/v0',
                             BackoffAdapter(HTTPAdapter()))
 
+    @map_exceptions
     def get_me(self):
         resp = self._session.get(
             to_endpoint_url('/user')
@@ -46,6 +74,7 @@ class DwContentsApi(object):
         resp.raise_for_status()
         return resp.json()
 
+    @map_exceptions
     def get_user(self, user):
         resp = self._session.get(
             to_endpoint_url('/users/{}'.format(user))
@@ -56,6 +85,7 @@ class DwContentsApi(object):
             resp.raise_for_status()
             return resp.json()
 
+    @map_exceptions
     @backoff.on_predicate(
         backoff.expo,
         predicate=lambda d: reduce(
@@ -72,14 +102,15 @@ class DwContentsApi(object):
             resp.raise_for_status()
             return resp.json()
 
+    @map_exceptions
     def get_datasets(self):
         def get(scope):
             req = Request(
                 method='GET',
                 url=to_endpoint_url('/user/datasets/{}'.format(scope)),
                 # TODO Fix API (accessLevel missing)
-                params={'limit': 50, 'fields': 'id,title,'
-                                               'accessLevel,created,updated'}
+                params={'limit': 50, 'fields': 'id,title,accessLevel,'
+                                               'created,updated'}
             )
 
             dataset_pages = [page for page in self._paginate(req)]
@@ -93,6 +124,7 @@ class DwContentsApi(object):
             datasets,
             key=lambda d: (d['owner'], d['id'])))
 
+    @map_exceptions
     def get_file(self, owner, dataset_id, file_name, format='json'):
         resp = self._session.get(
             to_endpoint_url('/file_download/{}/{}/{}'.format(
@@ -102,6 +134,7 @@ class DwContentsApi(object):
         resp.raise_for_status()
         return self._decode_response(resp, format)
 
+    @map_exceptions
     def upload_file(self, owner, dataset_id, file_name, data):
         # TODO Fix API (support for files in subdirectories)
         resp = self._session.put(
@@ -113,18 +146,21 @@ class DwContentsApi(object):
         resp.raise_for_status()
         return self.get_dataset(owner, dataset_id)
 
-    def delete_directory(self, owner, dataset_id, directory_name):
+    @map_exceptions
+    def delete_subdirectory(self, owner, dataset_id, directory_name):
         dataset = self.get_dataset(owner, dataset_id)
         for f in dataset.get('files', []):
             if f['name'].startswith(directory_path(directory_name)):
                 self.delete_file(owner, dataset_id, f['name'])
 
+    @map_exceptions
     def delete_file(self, owner, dataset_id, file_name):
         self._session.delete(
             to_endpoint_url('/datasets/{}/{}/files/{}'.format(
                 owner, dataset_id, quote(file_name, safe='')))
         ).raise_for_status()
 
+    @map_exceptions
     def delete_dataset(self, owner, dataset_id):
         self._session.delete(
             to_endpoint_url('/datasets/{}/{}'.format(owner, dataset_id))
@@ -133,9 +169,7 @@ class DwContentsApi(object):
     def _decode_response(self, resp, format):
         if format == 'json':
             content = resp.json()
-            major = content.get('nbformat', 1)
-            minor = content.get('nbformat_minor', 0)
-            nb = versions[major].to_notebook_json(content, minor=minor)
+            nb = to_nb_json(content, version_specific=True)
             # TODO Harden and deal with version migrations
             return nb
         elif format == 'base64':

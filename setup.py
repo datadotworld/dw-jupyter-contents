@@ -1,4 +1,4 @@
-# data.world-py
+# dwcontents
 # Copyright 2018 data.world, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,16 +40,18 @@ def find_version(*paths):
 setup(
     name='dwcontents',
     version=find_version('dwcontents', '__init__.py'),
-    description='data.world content manager for Jupyter',
+    description='Jupyter contents manager for data.world',
     long_description=read('README.rst'),
-    url='http://github.com/datadotworld/data.world-py',
+    url='http://github.com/datadotworld/dw-jupyter-contents',
     author='data.world',
     author_email='help@data.world',
     license='Apache 2.0',
     packages=find_packages(),
     keywords='data.world dataset',
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
+        'Development Status :: 4 - Beta',
+        'Framework :: IPython',
+        'Framework :: Jupyter',
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
@@ -61,14 +63,16 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Topic :: Database :: Database Engines/Servers',
-        'Topic :: Scientific/Engineering :: Information Analysis',
+        'Topic :: Scientific/Engineering',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     install_requires=[
         'backoff>=1.3.0,<2.0a',
         'certifi>=2017.04.17',
-        'ipython>=4.0,<=5.0.0',
-        'notebook>=4.0,<=5.0.0',
+        'datadotworld>=1.1.0,<2.0a',
+        'flake8>=2.6.0,<4.0a',
+        'ipython>=4.0,<=6.0a',
+        'notebook>=4.0,<=6.0a',
         'requests>=2.0.0,<3.0a',
         'six>=1.5.0,<2.0a',
     ],
@@ -78,12 +82,10 @@ setup(
     tests_require=[
         'coverage>=4.4.2',
         'doublex>=1.8.4,<2.0a',
-        'flake8>=2.6.0,<3.4.1a',
         'nose>=1.3.4,<2.0a',
-        'notebook[test]>=4.0,<=5.0.0',
+        'notebook[test]>=4.0,<5.0a',
         'pyhamcrest>=1.9.0,<2.0a',
         'pytest>=3.0.7,<4.0a',
-        'responses>=0.5.1,<1.0a',
     ],
     extras_require={
         'pandas': [

@@ -1,3 +1,22 @@
+# dwcontents
+# Copyright 2018 data.world, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the
+# License.
+#
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied. See the License for the specific language governing
+# permissions and limitations under the License.
+#
+# This product includes software developed at
+# data.world, Inc.(http://data.world/).
+
 from doublex import assert_that
 from hamcrest import equal_to
 
@@ -41,9 +60,6 @@ def test_to_api_path():
                 equal_to('owner/dataset/file.ext'))
     assert_that(to_api_path('owner/dataset/file.ext', root_dir='owner'),
                 equal_to('dataset/file.ext'))
-    assert_that(to_api_path('owner/dataset/file.ext',
-                            root_dir='owner', prefix='dw'),
-                equal_to('dw/dataset/file.ext'))
 
 
 def test_to_dw_path():
@@ -66,5 +82,3 @@ def test_unique_justseen():
     objs = [{'name': 'bbb'}, {'name': 'aaa'}, {'name': 'bbb'}]
     assert_that(list(unique_justseen(objs, lambda o: o['name'])),
                 equal_to([{'name': 'aaa'}, {'name': 'bbb'}]))
-
-
