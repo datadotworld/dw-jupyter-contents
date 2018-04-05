@@ -38,19 +38,19 @@ str('Use str() once to force PyCharm to keep import')
 
 
 def http_400(msg):
-    raise HTTPError(400, msg)
+    raise HTTPError(400, reason=msg)
 
 
 def http_403(msg):
-    raise HTTPError(403, msg)
+    raise HTTPError(403, reason=msg)
 
 
 def http_404(msg):
-    raise HTTPError(404, msg)
+    raise HTTPError(404, reason=msg)
 
 
 def http_409(msg):
-    raise HTTPError(409, msg)
+    raise HTTPError(409, reason=msg)
 
 
 class DwContents(ContentsManager):
@@ -234,8 +234,12 @@ class DwContents(ContentsManager):
             else:
                 http_403('Only files can be saved.')
         else:
-            if file_path is None or self.dir_exists(path):
+            if self.dir_exists(path):
                 http_400('Wrong type. {} is not a file.'.format(path))
+
+            if file_path is None:
+                http_404('Invalid path. Files can only be created '
+                         'inside datasets.')
 
             if model['type'] == 'notebook':
                 self.check_and_sign(to_nb_json(model['content']), path)
