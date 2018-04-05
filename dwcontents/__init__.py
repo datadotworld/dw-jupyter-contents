@@ -17,5 +17,5 @@
 # This product includes software developed at
 # data.world, Inc.(http://data.world/).
 
-__version__ = '1.0.0b1'
+__version__ = '1.0.0b2'
 from dwcontents.contents import DwContents  # noqa: F401
