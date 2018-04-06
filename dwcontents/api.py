@@ -24,17 +24,19 @@ from functools import reduce
 from time import sleep
 
 import backoff
-import tornado
+import requests
 from future.moves.urllib.parse import quote
-from requests import Request, Session, HTTPError
+from requests import Request, Session
 from requests.adapters import BaseAdapter, HTTPAdapter
+from tornado.web import HTTPError
 
 from dwcontents import __version__
-from dwcontents.utils import unique_justseen, directory_path, to_nb_json
+from dwcontents.utils import unique_justseen, directory_path, to_nb_json, MWT
 
 str('Use str() once to force PyCharm to keep import')
 
 MAX_TRIES = 10  # necessary to configure backoff decorator
+CACHE_TIMEOUT = 30
 
 
 def to_endpoint_url(endpoint):
@@ -45,9 +47,16 @@ def map_exceptions(fn):
     def decorated(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
-        except HTTPError as e:
-            raise tornado.web.HTTPError(
-                e.response.status_code, e.response.reason)
+        except requests.HTTPError as e:
+            try:
+                raise HTTPError(
+                    e.response.status_code, reason=e.response.json()['message']
+                )
+            except (KeyError, ValueError):
+                raise HTTPError(
+                    e.response.status_code, reason=e.response.reason)
+        except UnicodeDecodeError:
+            raise HTTPError(400, reason='Bad format')
 
     decorated.__doc__ = fn.__doc__
     return decorated
@@ -66,6 +75,7 @@ class DwContentsApi(object):
         self._session.mount('https://api.data.world/v0',
                             BackoffAdapter(HTTPAdapter()))
 
+    @MWT(timeout=CACHE_TIMEOUT)
     @map_exceptions
     def get_me(self):
         resp = self._session.get(
@@ -74,6 +84,7 @@ class DwContentsApi(object):
         resp.raise_for_status()
         return resp.json()
 
+    @MWT(timeout=CACHE_TIMEOUT)
     @map_exceptions
     def get_user(self, user):
         resp = self._session.get(
@@ -85,23 +96,25 @@ class DwContentsApi(object):
             resp.raise_for_status()
             return resp.json()
 
+    @MWT(timeout=CACHE_TIMEOUT)
     @map_exceptions
     @backoff.on_predicate(
         backoff.expo,
         predicate=lambda d: reduce(
             lambda r, f: r or f.get('sizeInBytes') is None,
-            d.get('files', []), False),
+            d.get('files', []) if d is not None else [], False),
         max_tries=lambda: MAX_TRIES)
     def get_dataset(self, owner, dataset_id):
         resp = self._session.get(
             to_endpoint_url('/datasets/{}/{}'.format(owner, dataset_id)),
         )
-        if resp.status_code == 404:
+        if resp.status_code in [400, 404]:
             return None
         else:
             resp.raise_for_status()
             return resp.json()
 
+    @MWT(timeout=CACHE_TIMEOUT)
     @map_exceptions
     def get_datasets(self):
         def get(scope):
@@ -109,8 +122,8 @@ class DwContentsApi(object):
                 method='GET',
                 url=to_endpoint_url('/user/datasets/{}'.format(scope)),
                 # TODO Fix API (accessLevel missing)
-                params={'limit': 50, 'fields': 'id,title,accessLevel,'
-                                               'created,updated'}
+                params={'limit': 100, 'fields': 'id,owner,title,accessLevel,'
+                                                'created,updated'}
             )
 
             dataset_pages = [page for page in self._paginate(req)]
@@ -144,6 +157,7 @@ class DwContentsApi(object):
             data=data,
             headers={'Content-Type': 'application/octet-stream'})
         resp.raise_for_status()
+        MWT().invalidate()
         return self.get_dataset(owner, dataset_id)
 
     @map_exceptions
@@ -152,6 +166,7 @@ class DwContentsApi(object):
         for f in dataset.get('files', []):
             if f['name'].startswith(directory_path(directory_name)):
                 self.delete_file(owner, dataset_id, f['name'])
+        MWT().invalidate()
 
     @map_exceptions
     def delete_file(self, owner, dataset_id, file_name):
@@ -159,12 +174,14 @@ class DwContentsApi(object):
             to_endpoint_url('/datasets/{}/{}/files/{}'.format(
                 owner, dataset_id, quote(file_name, safe='')))
         ).raise_for_status()
+        MWT().invalidate()
 
     @map_exceptions
     def delete_dataset(self, owner, dataset_id):
         self._session.delete(
             to_endpoint_url('/datasets/{}/{}'.format(owner, dataset_id))
         ).raise_for_status()
+        MWT().invalidate()
 
     def _decode_response(self, resp, format):
         if format == 'json':

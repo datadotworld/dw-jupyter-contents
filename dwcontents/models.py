@@ -53,7 +53,7 @@ def guess_format(path, type):
     else:
         split_path = path.rsplit('.', 2)
         ext = split_path[1] if len(split_path) > 1 else ''
-        if ext in ['csv', 'tsv', 'xls', 'xlsx', 'rdf', 'rdfs', 'owl', 'nt',
+        if ext in ['csv', 'tsv', 'rdf', 'rdfs', 'owl', 'nt',
                    'ttl', 'n3', 'json', 'jsonl', 'ndjson', 'ipynb', 'js', 'r',
                    'py', 'as', 'apl', 'bash', 'bas', 'bat', 'c', 'cpp', 'cs',
                    'css', 'd', 'dart', 'diff', 'go', 'ini', 'java', 'julia',
