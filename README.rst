@@ -41,6 +41,30 @@ For example:
     c.DwContents.dw_auth_token = 'YOUR TOKEN GOES HERE'
 
 
+You can also use this to access data.world alongside your local files using
+``dwcontents.HybridContents``.
+
+In that case, this is what your ``jupyter_notebook_config.py`` might look like:
+
+.. code-block:: python
+
+    import dwcontents
+    from notebook.services.contents.filemanager import FileContentsManager
+    c = get_config()
+    c.NotebookApp.contents_manager_class = dwcontents.HybridContents
+    c.HybridContents.manager_classes = {
+        # Associate the root directory data.world
+        '': dwcontents.DwContents,
+        # Associate /~local with your working directory
+        '~local': FileContentsManager
+    }
+    c.HybridContentsManager.manager_kwargs = {
+        '': {
+            'dw_auth_token': 'YOUR TOKEN GOES HERE'
+        }
+    }
+
+
 Run
 ---
 
