@@ -53,12 +53,12 @@ In that case, this is what your ``jupyter_notebook_config.py`` might look like:
     c = get_config()
     c.NotebookApp.contents_manager_class = dwcontents.HybridContents
     c.HybridContents.manager_classes = {
-        # Associate the root directory data.world
+        # Associate the root directory with data.world
         '': dwcontents.DwContents,
-        # Associate /~local with your working directory
+        # Associate /~local with your working directory, completely disconnected from data.world
         '~local': FileContentsManager
     }
-    c.HybridContentsManager.manager_kwargs = {
+    c.HybridContents.manager_kwargs = {
         '': {
             'dw_auth_token': 'YOUR TOKEN GOES HERE'
         }

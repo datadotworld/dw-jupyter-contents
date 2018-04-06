@@ -38,19 +38,19 @@ str('Use str() once to force PyCharm to keep import')
 
 
 def http_400(msg):
-    raise HTTPError(400, reason=msg)
+    raise HTTPError(400, log_message=msg, reason=msg)
 
 
 def http_403(msg):
-    raise HTTPError(403, reason=msg)
+    raise HTTPError(403, log_message=msg, reason=msg)
 
 
 def http_404(msg):
-    raise HTTPError(404, reason=msg)
+    raise HTTPError(404, log_message=msg, reason=msg)
 
 
 def http_409(msg):
-    raise HTTPError(409, reason=msg)
+    raise HTTPError(409, log_message=msg, reason=msg)
 
 
 class DwContents(ContentsManager):
@@ -78,8 +78,6 @@ class DwContents(ContentsManager):
 
         # Share token with datadotworld package
         os.environ['DW_AUTH_TOKEN'] = token
-
-        # TODO Support hybrid config
 
     def dir_exists(self, path):
         self.log.debug('[dir_exists] Checking {}'.format(path))
@@ -128,7 +126,7 @@ class DwContents(ContentsManager):
 
         if type == 'directory':
             if not self.dir_exists(path):
-                raise http_404('No such entity')
+                raise http_404('Directory not found ({}).'.format(path))
 
             if owner is None:
                 # List root content
@@ -155,10 +153,11 @@ class DwContents(ContentsManager):
 
         else:  # File or notebook
             if file_path is None:
-                http_400('Wrong type. {} is not a file.'.format(path))
+                http_404('Not a valid file path ({}). Files can only exist '
+                         'within datasets or data projects.'.format(path))
 
             if not self.file_exists(path):
-                http_404('No such entity')
+                http_404('File not found ({}).'.format(path))
 
             content_func = None
             if content:
@@ -195,13 +194,14 @@ class DwContents(ContentsManager):
             old_path, new_path))
 
         if old_path == '':
-            http_409('Cannot rename root')
+            http_400('Cannot rename root.')
 
         if self.exists(new_path):
-            http_409('File already exists ({})'.format(new_path))
+            http_409('File already exists ({}).'.format(new_path))
 
         owner, dataset_id, file_path = self._to_dw_path(new_path)
-        if file_path is None or self.dir_exists(old_path):
+
+        if self.dir_exists(old_path):
             # This is an account, dataset/project or subdirectory
             if self.compatibility_mode:
                 dataset = self.api.get_dataset(owner, dataset_id)
@@ -212,7 +212,11 @@ class DwContents(ContentsManager):
                             f['name'],
                             normalize_path(new_path, f['name'][len(parent):]))
             else:
-                http_403('Only files can be renamed')
+                http_400('Only files can be renamed.')
+
+        if file_path is None:
+            http_400('Invalid path ({}). Files can only be created within '
+                     'datasets or data projects.'.format(new_path))
 
         old_file = self.get(old_path, content=True)
         self.save(old_file, new_path)
@@ -232,14 +236,34 @@ class DwContents(ContentsManager):
                 return self.mapper.map_subdir(
                     file_path, '', self.api.get_dataset(owner, dataset_id))
             else:
-                http_403('Only files can be saved.')
+                if file_path is not None:
+                    http_400('Unable to create directory ({}). Only '
+                             'files can be created within data sets '
+                             'or data projects.'.format(path))
+                elif dataset_id is not None:
+                    # This should be possible, however, Jupyter doesn't prompt
+                    # users to name the directory and instead creates an
+                    # untitled directory.
+                    # Until data.world supports moving datasets, users wouldn't
+                    # be able to give them proper names.
+                    # TODO Fix API (support moving datasets)
+                    http_400('Unable to create directory ({}). This path is'
+                             'reserved for datasets or data projects '
+                             'that must be managed via data.world\'s '
+                             'website. Visit https://data.world/'
+                             'create-a-project'.format(path))
+                else:
+                    http_400('Unable to create directory ({}). This path is'
+                             'reserved for data.world accounts that '
+                             'must be created via data.world\'s '
+                             'website.'.format(path))
         else:
             if self.dir_exists(path):
                 http_400('Wrong type. {} is not a file.'.format(path))
 
             if file_path is None:
-                http_404('Invalid path. Files can only be created '
-                         'inside datasets.')
+                http_400('Invalid path ({}). Files can only be created '
+                         'within datasets or data projects.'.format(path))
 
             if model['type'] == 'notebook':
                 self.check_and_sign(to_nb_json(model['content']), path)
@@ -266,13 +290,20 @@ class DwContents(ContentsManager):
 
     def delete_file(self, path):
         self.log.debug('[delete_file] Deleting {}'.format(path))
+        if not self.exists(path):
+            http_404('Not found ({}).'.format(path))
+
         owner, dataset_id, file_path = self._to_dw_path(path)
         if file_path is None:
-            # This is an account or dataset/project
-            http_403('Only dataset contents can be deleted.')
+            if dataset_id is not None:
+                self.api.delete_dataset(owner, dataset_id)
+                return
 
-        if not self.exists(path):
-            http_404('No such entity.')
+            # This is an account
+            http_400('Unable to delete ({}). Top-level '
+                     'directories represent data.world accounts and '
+                     'can only be deleted via data.world\'s '
+                     'website'.format(path))
 
         if guess_type(path, self.dir_exists) != 'directory':
             self.api.delete_file(owner, dataset_id, file_path)
