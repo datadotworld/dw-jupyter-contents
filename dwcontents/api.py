@@ -50,13 +50,17 @@ def map_exceptions(fn):
         except requests.HTTPError as e:
             try:
                 raise HTTPError(
-                    e.response.status_code, reason=e.response.json()['message']
+                    e.response.status_code,
+                    log_message=e.response.json()['message'],
+                    reason=e.response.json()['message']
                 )
             except (KeyError, ValueError):
                 raise HTTPError(
-                    e.response.status_code, reason=e.response.reason)
+                    e.response.status_code,
+                    log_message=e.response.reason,
+                    reason=e.response.reason)
         except UnicodeDecodeError:
-            raise HTTPError(400, reason='Bad format')
+            raise HTTPError(400, log_message='Bad format', reason='Bad format')
 
     decorated.__doc__ = fn.__doc__
     return decorated
@@ -90,7 +94,7 @@ class DwContentsApi(object):
         resp = self._session.get(
             to_endpoint_url('/users/{}'.format(user))
         )
-        if resp.status_code == 404:
+        if resp.status_code in [400, 404]:
             return None
         else:
             resp.raise_for_status()
@@ -121,7 +125,6 @@ class DwContentsApi(object):
             req = Request(
                 method='GET',
                 url=to_endpoint_url('/user/datasets/{}'.format(scope)),
-                # TODO Fix API (accessLevel missing)
                 params={'limit': 100, 'fields': 'id,owner,title,accessLevel,'
                                                 'created,updated'}
             )
