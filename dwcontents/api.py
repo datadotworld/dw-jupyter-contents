@@ -35,12 +35,25 @@ from dwcontents.utils import unique_justseen, directory_path, to_nb_json, MWT
 
 str('Use str() once to force PyCharm to keep import')
 
-MAX_TRIES = 10  # necessary to configure backoff decorator
+MAX_TRIES = 5  # necessary to configure backoff decorator
 CACHE_TIMEOUT = 30
 
 
 def to_endpoint_url(endpoint):
     return 'https://api.data.world/v0{}'.format(endpoint)
+
+
+def is_dataset_ready(d):
+    files = d.get('files', []) if d is not None else []
+
+    def is_file_ready(cur_file):
+        file_source = cur_file.get('source', {})
+        sync_status = file_source.get('syncStatus', 'UKNOWN')
+        return (cur_file.get('sizeInBytes') is not None or
+                sync_status not in ['NEW', 'INPROGRESS'])
+
+    return reduce(lambda ready, cur_file: ready and is_file_ready(cur_file),
+                  files, True)
 
 
 def map_exceptions(fn):
@@ -104,9 +117,7 @@ class DwContentsApi(object):
     @map_exceptions
     @backoff.on_predicate(
         backoff.expo,
-        predicate=lambda d: reduce(
-            lambda r, f: r or f.get('sizeInBytes') is None,
-            d.get('files', []) if d is not None else [], False),
+        predicate=lambda d: not (is_dataset_ready(d)),
         max_tries=lambda: MAX_TRIES)
     def get_dataset(self, owner, dataset_id):
         resp = self._session.get(
