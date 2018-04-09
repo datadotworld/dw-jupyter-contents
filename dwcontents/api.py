@@ -35,7 +35,7 @@ from dwcontents.utils import unique_justseen, directory_path, to_nb_json, MWT
 
 str('Use str() once to force PyCharm to keep import')
 
-MAX_TRIES = 5  # necessary to configure backoff decorator
+MAX_TRIES = 10  # necessary to configure backoff decorator
 CACHE_TIMEOUT = 30
 
 
@@ -48,9 +48,9 @@ def is_dataset_ready(d):
 
     def is_file_ready(cur_file):
         file_source = cur_file.get('source', {})
-        sync_status = file_source.get('syncStatus', 'UKNOWN')
+        sync_status = file_source.get('syncStatus')
         return (cur_file.get('sizeInBytes') is not None or
-                sync_status not in ['NEW', 'INPROGRESS'])
+                sync_status not in [None, 'NEW', 'INPROGRESS'])
 
     return reduce(lambda ready, cur_file: ready and is_file_ready(cur_file),
                   files, True)
@@ -118,7 +118,8 @@ class DwContentsApi(object):
     @backoff.on_predicate(
         backoff.expo,
         predicate=lambda d: not (is_dataset_ready(d)),
-        max_tries=lambda: MAX_TRIES)
+        max_tries=lambda: MAX_TRIES,
+        factor=0.1)
     def get_dataset(self, owner, dataset_id):
         resp = self._session.get(
             to_endpoint_url('/datasets/{}/{}'.format(owner, dataset_id)),
