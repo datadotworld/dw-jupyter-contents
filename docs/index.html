@@ -1,1 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css" integrity="sha384-Smlep5jCw/wG7hdkwQ/Z5nLIefveQRIY9nfy6xoR1uRYBtpZgI6339F5dgvm/e9B" crossorigin="anonymous">
+
+    <title>data.world and KNOTS</title>
+    <link href="https://fonts.googleapis.com/css?family=Lato:400,700,900" rel="stylesheet">
+  </head>
+  <body style="color:#333D49;">
+<!--jumbotron header-->
+    <div class="header" style="background:#333D49; max-height:150px;">
+      
+      <div class="container p-responsive py-6 py-lg-10 text-center" style="color:#fff;">
+        <img src="dw+jupyter_light.png" class="mb-3 mb-sm-5 col-6 col-sm-12" style="max-width:550px;">
+      </div>
+
+    </div>
+<!--first intro-->
+  <div class="container align-items-center text-center form-group align-items-center" style="padding-bottom:1em;padding-top:1em;">
+    <h2 class="display-4"> Start Using Jupyter</h2>
+            <p class="lead"> Write, explore, and share your code with Jupyter's visual interface for Python and other coding languages
+            </p>
+            
+  </div>
+<!--first section-->
+  <div class="container text-center form-group" style="padding-bottom:1em;padding-top:1em;">
+    <h2 class="font-weight-light"> Choose a Host</h2>
+            <p class="font-weight-light" style="padding-top:1em;"> You can choose to run the Jupyter app on either a personal server or <a href="" target="_blank">Heroku</a>. <br><br> <i><b>Note: </b>Heroku offers an easy alternative to setting up and maintaining your own server </i>  </p>
+            <div class="row text-center form-group" style="padding-bottom:1em;">
+                <div class="form-group p-3 col-sm-12" style="padding-bottom:2em;">
+                  <img src="choosehost.png" class="shadow img-fluid" style="max-height:30em;">
+                </div>
+  
+  <!--second section-->
+  <div class="container text-center form-group" style="padding-bottom:1em; padding-top:2em;">
+    <h2 class="font-weight-light"> Choose an App or Create a New App With Heroku</h2>
+            <p class="font-weight-light"> You can choose to work within a previously created version of Jupyter Notebook or create a new instance. <br><br> <i><b>Note: </b>Following setup instructions will be using Heroku, <a href="#personalserver">See below</a> for information on configuring a personal server</i></p>
+            <ul style="list-style-position: inside; padding-top:1em; display:inline;" class="col-sm-6 offset-sm-3 text-center align-items-center">
+              <li class="font-weight-light text-center" style="padding-bottom:1em;">To open an existing instance, select from the list</b>
+              </li>
+              <div class="row text-center form-group" style="padding-bottom:1em;">
+                <div class="form-group p-3 col-sm-8 offset-sm-2" style="padding-bottom:2em;">
+                  <img src="openapp.png" class="shadow img-fluid" style="max-height:30em;">
+                </div>
+              </div>
+              <li class="font-weight-light text-center" style="padding-bottom:1em;">To create a new instance:<br>
+                <ol style="list-style-position: inside; padding-top:1em; display:inline;class="col-sm-6 offset-sm-3 text-center align-items-center">
+                    <li class="font-weight-light text-center" style="padding-bottom:1em;">Select <b>Create New</b> button
+                    </li>
+                    <div class="row text-center form-group" style="padding-bottom:1em;">
+                      <div class="form-group p-3 col-sm-8 offset-sm-2">
+                        <img src="createnew1.png" class="shadow img-fluid" style="max-height:30em;">
+                      </div>
+                    </div>
+                    <li class="font-weight-light text-center" style="padding-bottom:1em;">Create a password and enter any required Python packages
+                    </li>
+                    <div class="row text-center form-group" style="padding-bottom:1em;">
+                      <div class="form-group p-3 col-sm-8 offset-sm-2" style="padding-bottom:2em;">
+                        <img src="createapp.png" class="shadow img-fluid" style="max-height:35em;">
+                      </div>
+                    </div>
+                    <li class="font-weight-light text-center" style="padding-bottom:1em;">Once you've created your app, check the box if you want to use this instance each time you open Jupyter Notebooks
+                    </li>
+                    <div class="row text-center form-group">
+                      <div class="form-group p-3 col-sm-8 offset-sm-2">
+                        <img src="notebook-success.png" class="shadow img-fluid" style="max-height:30em;">
+                      </div>
+                    </div>
+                </ol>
+              </li>
+              </ul>
+</div>
+<!--third section-->
+  <div class="container text-center" style="padding-bottom:1em;">
+    <h2 class="font-weight-light" id="personalserver"> Open or Create an App From a Personal Server </h2>
+            <p class="font-weight-light"> You can choose to work within a previously created version of Jupyter Notebook or create a new instance. <br><br> <i><b>Note: </b>Following setup instructions will be using a personal server, <a href="#workspace">Skip this section</a> if you are using Heroku</i></p>
+            <ul style="list-style-position: inside; padding-top:1em; display:inline;" class="col-sm-6 offset-sm-3 text-center align-items-center">
+              <li class="font-weight-light text-center col-sm-8 offset-sm-2" style="padding-bottom:1em;">Install, Configure, and Run Jupyter with the following commands
+              </li>
+              <div class="row text-center form-group" style="padding-bottom:1em;">
+                <div class="form-group p-3 col-sm-8 offset-sm-2" style="padding-bottom:2em;">
+                  <img src="personalserver.png" class="shadow img-fluid" style="max-height:35em;">
+                </div>
+              </div>
+              </div>
+              </ul>
+</div>
+<!--fourth section-->
+  <div class="container text-center" style="padding-bottom:1em;">
+    <h2 class="font-weight-light" id="workspace"> Using the Jupyter Workspace</h2>
+            <p class="font-weight-light"> Use Jupyter to create new notebooks or open & edit previous notebooks</p>
+            <ol style="list-style-position: inside; padding-top:1em; display:inline;" class="col-sm-6 offset-sm-3 text-center align-items-center">
+              <li class="font-weight-light text-center col-sm-8 offset-sm-2" style="padding-bottom:1em;">Create a new notebook or open any previous notebook (.ipynb files)
+              </li>
+              <div class="row text-center form-group" style="padding-bottom:1em;">
+                <div class="form-group p-3 col-sm-10 offset-sm-1" style="padding-bottom:2em;">
+                  <img src="launcher.png" class="shadow img-fluid" style="max-height:40em;">
+                </div>
+              </div>
+              <li class="font-weight-light text-center col-sm-8 offset-sm-2" style="padding-bottom:1em;">Start writing code!
+              </li>
+              </ol>
+              </div>
+</div>
+<!--fifth section-->
+ <hr>
+  <div class="container text-center" style="padding-bottom:1em;">
+    <h2 class="font-weight-light" id="personalserver"> What Can I do? </h2>
+            <p class="font-weight-light"> Using Jupyter Notebooks, you can write and share your code so others can see your work, but that's not all. Because Jupyter is a visual interface for coding languages, you can execute standard code from within the Jupyter environment. </p>
+  </div>
+<!--import-->
+  <div class="container">
+      <div class="row align-items-center form-group" style="padding-bottom:20px;padding-top:20px;">
+        <div class="col-sm-6 form-group">
+            <h2 class="font-weight-light"> Import Packages</h2>
+            <p class="font-weight-light"> Quickly and easily import the packages your need for your project.</p>
+        </div>
+        <div style="padding-top:2em; padding-bottom:2em;">
+           <img src="importlibs.png" class="shadow offset-sm-2 img-fluid card">
+        <div>
+      </div>
+    </div>
+    </div>
+    </div>
+<!-- load datasets-->
+<div class="container">
+      <div class="row align-items-center form-group" style="padding-bottom:20px;padding-top:20px;">
+      <div style="padding-top:2em; padding-bottom:2em;">
+           <img src="loaddataset.png" style="max-width:45em;" class="shadow img-fluid card col-sm-3 align-items-center form-group">
+      </div>
+        <div class="col-sm-5 form-group offset-sm-1">
+            <h2 class="font-weight-light"> Load Datasets from data.world</h2>
+            <p class="font-weight-light"> Load datasets through URL and set the desired variables</p>
+        </div>
+        
+    </div>
+    </div>
+    </div>
+<!--show table-->
+  <div class="container">
+      <div class="row align-items-center form-group" style="padding-bottom:20px;padding-top:20px;">
+        <div class="col-sm-6 form-group">
+            <h2 class="font-weight-light">Create Pivot Tables</h2>
+            <p class="font-weight-light">Create pivot tables to match your needs & organize your data just the way you want it.</p>
+        </div>
+        <div style="padding-top:2em; padding-bottom:2em;">
+           <img src="pivot3.png" style="max-width:35em;" class="shadow offset-sm-1 img-fluid card col-sm-3 align-items-center form-group">
+        <div>
+      </div>
+    </div>
+    </div>
+    </div>
+<!-- charts-->
+<div class="container">
+      <div class="row align-items-center form-group" style="padding-bottom:20px;padding-top:20px;">
+      <div style="padding-top:2em; padding-bottom:2em;">
+           <img src="chart2.png" style="max-width:35em;" class="shadow img-fluid card col-sm-3 align-items-center form-group">
+      </div>
+        <div class="col-sm-5 form-group offset-sm-1">
+            <h2 class="font-weight-light"> Create and View Charts</h2>
+            <p class="font-weight-light"> Turn your reports into charts and view them directly inline with your code
+        </div>
+        
+    </div>
+    </div>
+    </div>
+<!--to csv-->
+  <div class="container">
+      <div class="row align-items-center form-group" style="padding-bottom:20px;padding-top:20px;">
+        <div class="col-sm-6 form-group">
+            <h2 class="font-weight-light">Save Tables to CSV</h2>
+            <p class="font-weight-light">Save your data locally as a CSV, which will also allow you to upload directly to data.world</p>
+        </div>
+        <div style="padding-top:2em; padding-bottom:2em;">
+           <img src="tocsv1.png" style="max-width:35em;" class="shadow offset-sm-3 img-fluid card col-sm-3 align-items-center form-group">
+        <div>
+      </div>
+    </div>
+    </div>
+    </div>
+<!-- upload-->
+<div class="container">
+      <div class="row align-items-center form-group" style="padding-bottom:20px;padding-top:20px;">
+      <div style="padding-top:2em; padding-bottom:2em;">
+           <img src="exporttodw.png"  class="shadow img-fluid card align-items-center form-group">
+      </div>
+        <div class="col-sm-4 form-group offset-sm-2">
+            <h2 class="font-weight-light"> Upload CSVs to data.world</h2>
+            <p class="font-weight-light"> You can upload CSVs directly to your data.world project, all within your notebook file <br><i>(Make sure you've imported data.world using <b>import datadotworld as dw</b>)</i>
+        </div>
+        
+    </div>
+    </div>
+    </div>
+<!--more-->
+ <hr>
+  <div class="container text-center" style="padding-bottom:1em;">
+    <h2 class="font-weight-light" id="personalserver"> And More! </h2>
+            <p class="font-weight-light"> With Jupyter, you'll be able to:</p>
+            <div class="form-group col-sm-8 text-align-center align-items-center offset-sm-2">
+            <ul style="list-style-position: inside; padding-top:1em; display:inline;">
+                <li>Share documents containing live code</li>
+                <li>Display equations, visualizations, text, and more within your document</li>
+                <li>Clean and manipulate data</li>
+                <li>Use statistical modeling</li>
+                <li>Open .ipynb files directly from the <b>Open in App Menu</b> in data.world</li>
+                <li>View terminals, text editors, data file viewers, and other custom components side-by-side with notebooks in a convenient tabbed view</li>
+            </ul>
+            </div>
+  </div>
+<!--footer-->
+<div class="footer text-center align-items-center" style="padding-top:3em; padding-bottom: 3em; background-color:#333D49; color:#fff">
+    <h4 class="font-weight-light"> Want to see more information on the data.world + Jupyter Integration? <u><a href="https://github.com/datadotworld/dw-jupyter-contents" style="color:#fff; font-weight:600;" target="_blank">check it out here</a></u>.
+    </h4>
+</div>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/js/bootstrap.min.js" integrity="sha384-o+RDsa0aLu++PJvFqy8fFScvbHFLtbvScb8AjopnFD+iEQ7wo/CG0xlczd+2O/em" crossorigin="anonymous"></script>
+  </body>
+</html>
