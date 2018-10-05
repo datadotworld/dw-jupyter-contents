@@ -1,0 +1,244 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/css/bootstrap.min.css" integrity="sha384-Smlep5jCw/wG7hdkwQ/Z5nLIefveQRIY9nfy6xoR1uRYBtpZgI6339F5dgvm/e9B" crossorigin="anonymous">
+
+    <title>data.world and Jupyter</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,400i,700,700i" rel="stylesheet">
+  </head>
+  <body style="color:#333D49;">
+<!--jumbotron header-->
+    <div class="header" style="background:#333D49; max-height:150px;">
+      
+      <div class="container p-responsive py-6 py-lg-10 text-center" style="color:#fff;">
+        <img src="dw+jupyter_light.png" class="mb-3 mb-sm-5 col-6 col-sm-12" style="max-width:550px;">
+      </div>
+
+    </div>
+<!--first intro-->
+  <div class="container align-items-center text-center form-group align-items-center" style="padding-bottom:1em;padding-top:4em;">
+    <h1 style="font-weight:400"> You've enabled Jupyter, now what?</h1>
+            <p class="h5" style="font-weight:300"> Write, explore, and share your code with Jupyter's visual interface for Python and other coding languages. 
+            </p>
+            
+  </div>
+<!--first section-->
+  <div class="container" style="padding-bottom:1em;padding-top:2em;" id="choosehost">
+    <div class="row">
+      <div class="col">
+        <h2 style="font-weight:400"> Choose your preferred host.</h2>
+                <p class="h5" style="font-weight:300"> You can choose to run the Jupyter app on either a personal server or <a href="" target="_blank">Heroku</a>.</p>
+                <div class="alert alert-info col-sm-9">
+                Heroku offers a free, cloud-based alternative to a personal server.
+                </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+                  <div class="col-sm-9" style="padding-top:2em; padding-bottom:1em;">
+                      <img src="choosehost.png" class="img-fluid card rounded" style="box-shadow:7px 7px 30px grey;">
+                  </div>
+      </div>
+   </div>
+ </div>
+<!--second section-->
+  <div class="container" style="padding-top:4em;">
+    <div class="row">
+        <div class="col">
+            <h2 style="font-weight:400"> Choose an app (or create a new app) with Heroku.</h2>
+              <p class="h5" style="font-weight:300"> You can choose to work within a previously created version of Jupyter Notebook or create a new instance.</p> 
+              <div class="alert alert-warning">
+                <i style="font-weight:300;">The following setup instructions will be using Heroku, <a href="#personalserver">see below</a> for information on configuring a personal server</i>.
+              </div>
+        </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="row">
+        <div class="col">
+            <ol style="list-style-position: inside;">
+              <li style="padding-bottom:1em; font-weight:300; padding-top:2em;">Choose Heroku from the host options in the <a href="#choosehost"><b>Choose a host</b></a> panel.
+              </li>
+              <li style="padding-bottom:1em; font-weight:300;">Choose a previously created app from your list, or click <b>Create New</b> to create a new iteration of Jupyter.
+              </li>
+            </ol>
+            <div class="col-sm-7" style="padding-bottom:3em;">
+                  <img src="jupyter_heroku.png" class="img-fluid card rounded" style="box-shadow:7px 7px 30px grey;">
+            </div>  
+            <ul style="list-style-position: inside;">
+              <li style="font-weight:300;">If creating a new app, you will need to create a password and enter any required Python packages.
+              </li>
+            </ul>
+              <div class="col-sm-7" style="padding-top:1em;">
+                  <img src="createapp.png" class="img-fluid card rounded" style="box-shadow:7px 7px 30px grey;">
+              </div>   
+
+</div>  
+</div> 
+</div> 
+<!--third section-->
+  <div class="container" style="padding-bottom:1em;padding-top:4em;" id="personalserver">
+    <div class="row">
+        <div class="col">
+            <h2 style="font-weight:400"> Configure & use a personal server. </h2>
+              <p class="h5" style="font-weight:300"> Using a personal server is an easy way to run applications, allowing you full control over setup and configuration.</p> 
+              <div class="alert alert-warning">
+                <i style="font-weight:300;">The following setup instructions will be using a personal server, <a href="#workspace">skip this section</a> if you are using Heroku.</i>
+              </div>
+              <ol style="list-style-position: inside; padding-top:2em;">
+                <li style="padding-bottom:1em; font-weight:300;">Choose Personal Server from the host options in the <a href="#choosehost"><b>Choose a host</b></a> panel.
+                </li>
+                <li style="font-weight:300;"> <i>[Locally]:</i> Create your server
+                  <ul style="list-style-position: inside; padding-top:1em;">
+                  <li style="font-weight:300;">Install
+                    <div class="alert alert-secondary col-sm-7" style="margin-top:1em;">
+                      Use <code>pip</code> (Python 2.7 or 3.4+)
+                      <div class="alert alert-light" style="margin-top:1em;">
+                        <code style="font-weight:300;">
+                            pip install dwcontents
+                        </code>
+                      </div>
+                    </div>
+                  </li>
+                   <li style="font-weight:300;">Configure
+                     <div class="alert alert-secondary col-sm-7" style="margin-top:1em;">
+                    Create or update <code>~/.jupyter/jupyter_notebook_config.py</code> with settings:
+                    <div class="alert alert-light" style="margin-top:1em;">
+                      <code style="font-weight:300;">
+                          import dwcontents <br>
+                          import os<br>
+                          c = get_config()<br>
+                          c.NotebookApp.contents_manager_class = dwcontents.DwContents<br>
+                          c.DwContents.dw_auth_token = 'YOUR_API_TOKEN'<br>
+                      </code>
+                    </div>
+                    <span style="font-size:85%">You can get your API token in your data.world <a href="https://data.world/settings/advanced" target="_blank">advanced settings</a>.</span>
+                  </div>
+                  </li>
+                   <li style="font-weight:300;">Run
+                   <div class="alert alert-secondary col-sm-7" style="margin-top:1em;">
+                    Assuming <code>jupyter</code> and <code>jupyterlab</code> (optional) have already been installed, start as normal, for example:
+                    <div class="alert alert-light" style="margin-top:1em;">
+                      <code style="font-weight:300;">
+                          $ jupyter lab
+                      </code>
+                    </div>
+                  </div>
+                  </li>
+                </ul>
+              </li>
+              <li style="font-weight:300; padding-top:2em;"><i>[On data.world]:</i> Click <b>Continue</b>, enter your server's URL, and open your notebook.
+               <div class="col-sm-7" style="padding-top:2em; padding-bottom:3em;">
+                  <img src="jupyter_serverURL.png" class="img-fluid card rounded" style="box-shadow:7px 7px 30px grey;">
+              </div> 
+              <div class="alert alert-warning">
+              If you'd like to use the same server each time you open Jupyter, remember to click the optional checkbox. 
+              </div>
+              </li>
+            </ol>
+              
+        </div>
+    </div>
+  </div>
+</div> 
+</div>  
+<!--fourth section-->
+  <div class="container" style="padding-top:4em;" id="workspace">
+    <div class="row">
+        <div class="col">
+            <h2 style="font-weight:400"> Use the Jupyter workspace.</h2>
+              <p class="h5" style="font-weight:300"> Use Jupyter to create new notebooks or open & edit previous notebooks.</p> 
+        </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="row">
+        <div class="col">
+            <ol style="list-style-position: inside;">
+              <li style="padding-bottom:1em; font-weight:300; padding-top:2em;">Create a new notebook or open any previous notebook (<code>.ipynb</code> files).
+              </li>
+              <div class="col-sm-9" style="padding-bottom:3em;">
+                  <img src="jupyter_workspace.png" class="img-fluid card rounded" style="box-shadow:7px 7px 30px grey;">
+            </div>
+              <li style="font-weight:300;">Start writing code!
+              </li>
+            </ol>
+              
+</div>  
+</div> 
+</div>    
+<!--what's next-->
+<hr style="margin-top:3em;">
+<div class="container" style="padding-bottom:1em; padding-top:1em;">
+<div class="row">
+<div class="col">
+
+    <h2 style="font-weight:400; padding-top:1em;"> What next?</h2>
+            <p class="h5" style="font-weight:300"> Here are a few things you can do with Jupyter and data.world:</p>
+            <ul style="list-style-position: inside; padding-top:2em;">
+              <li style="padding-bottom:1em; font-weight:300;">Load data directly from data.world into your notebook with project ID using the <code>import datadotworld</code> function and <code> <i>var</i> = dw.load_dataset('<i>project-id</i>')</code>
+                  <div class="alert alert-secondary col-sm-7" style="margin-top:1em;">
+                  <b>Example:</b>
+                      <div class="alert alert-light" style="margin-top:1em;">
+                        <code style="font-weight:300;">
+                            import datadotworld as dw <br>
+                            lds = dw.load_dataset('garyhoov/us-food-imports-and-exports')
+                        </code>
+                      </div>
+                    </div>
+              </li>
+              <li style="padding-bottom:1em; font-weight:300;">
+              Save tables locally as CSVs, using <code><i>table_name</i>.to_csv('<i>csvname</i>.csv', index=True)</code>, which will allow you to upload directly to data.world through Jupyter.
+              <div class="alert alert-secondary col-sm-7" style="margin-top:1em;">
+                  <b>Example:</b>
+                      <div class="alert alert-light" style="margin-top:1em;">
+                        <code style="font-weight:300;">
+                            foodspivot.to_csv('foods.csv', index=True)
+                        </code>
+                      </div>
+                    </div>
+              </li>
+               <li style="font-weight:300;">Upload CSVs directly to your data.world project, all within your notebook file, using the data.world API. <i>make sure you've imported data.world using <code>import datadotworld</code></i>
+               <div class="alert alert-secondary col-sm-7" style="margin-top:1em;">
+                  <b>Example:</b>
+                      <div class="alert alert-light" style="margin-top:1em;">
+                        <code style="font-weight:300;">
+                            import datadotworld as dw<br>
+                            client = dw.api_client()<br>
+                            client.upload_files('sarakbarr/test-projects', 'foods.csv')<br>
+                            client.upload_files('sarakbarr/test-projects', 'foods_chart.png')
+                        </code>
+                      </div>
+                    </div>
+              </li>
+              <li style="padding-bottom:1em; font-weight:300;">
+              Share documents containing live code, text, visualizations, and more.
+              </li>
+              <li style="padding-bottom:1em; font-weight:300;">
+              Manipulate data and use statistical modeling.
+              </li>
+            </ul>
+  </div> 
+  </div>
+  </div>     
+<!--footer-->
+<div class="jumbotron-fluid text-center align-items-center border-top" style="margin-top:3em; padding-top:3em; padding-bottom: 3em; background-color:#F2F2F2; color:#36454f">
+    <h4 style="font-weight:300"> Want to see more information on the data.world + Jupyter Integration? <u><a href="https://github.com/datadotworld/dw-jupyter-contents" style="color:#36454f; font-weight:600;" target="_blank">check it out here</a></u>.
+    </h4>
+</div>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.2/js/bootstrap.min.js" integrity="sha384-o+RDsa0aLu++PJvFqy8fFScvbHFLtbvScb8AjopnFD+iEQ7wo/CG0xlczd+2O/em" crossorigin="anonymous"></script>
+  </body>
+</html>
