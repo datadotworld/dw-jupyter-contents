@@ -80,7 +80,7 @@ setup(
         'pytest-runner>=2.11,<3.0a',
     ],
     tests_require=[
-        'coverage>=4.4.2',
+        'coverage<=4.5.1',
         'doublex>=1.8.4,<2.0a',
         'nose>=1.3.4,<2.0a',
         'notebook[test]>=4.0,<5.0a',
